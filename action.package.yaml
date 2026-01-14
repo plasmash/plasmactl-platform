@@ -1,0 +1,4 @@
+runtime: plugin
+action:
+  title: Package
+  description: "Creates an archive to contain composed-compiled-propagated artifact"
