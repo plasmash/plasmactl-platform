@@ -1,0 +1,15 @@
+runtime: plugin
+action:
+  title: Publish
+  description: "Upload local artifact archive to private repository"
+  options:
+    - name: username
+      title: Username
+      description: Username for artifact repository
+      type: string
+      default: ""
+    - name: password
+      title: Password
+      description: Password for artifact repository
+      type: string
+      default: ""

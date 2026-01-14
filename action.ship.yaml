@@ -1,0 +1,68 @@
+runtime: plugin
+action:
+  title: Meta
+  description: "Push code + bump and deploy in CI (compose + sync + package + publish + deploy). Use: meta [flags] environment tags"
+  alias:
+    - deliver
+  arguments:
+    - name: environment
+      title: Environment
+      required: true
+    - name: tags
+      title: Tags
+      required: true
+  options:
+    - name: last
+      title: Last
+      description: Last flag for local bump command
+      type: boolean
+      default: false
+    - name: skip-bump
+      title: Skip bump
+      description: Skip execution of local bump command
+      type: boolean
+      default: false
+    - name: skip-prepare
+      title: Skip prepare
+      description: Skip execution of prepare command (only works with --local)
+      type: boolean
+      default: false
+    - name: ci
+      title: CI
+      description: Execute all commands and deploy in CI (default)
+      type: boolean
+      default: false
+    - name: gitlab-domain
+      title: Gitlab domain
+      description: Gitlab domain to deploy in CI
+      type: string
+      default: ""
+      process:
+        - processor: config.GetValue
+          options:
+            path: platform.deploy.gitlab_domain
+    - name: local
+      title: Local
+      description: Execute compose + sync + package + publish + deploy locally instead of using CI
+      type: boolean
+      default: false
+    - name: clean
+      title: Clean
+      description: Clean flag for compose command (only works with --local)
+      type: boolean
+      default: false
+    - name: clean-prepare
+      title: Clean prepare
+      description: Clean flag for prepare command - removes existing prepare directory (only works with --local)
+      type: boolean
+      default: false
+    - name: debug
+      title: Debug
+      description: Run Ansible in debug mode
+      type: boolean
+      default: false
+    - name: conflicts-verbosity
+      title: Conflicts verbosity
+      description: Log files conflicts during composition
+      type: boolean
+      default: false

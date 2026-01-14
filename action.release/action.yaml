@@ -1,0 +1,44 @@
+working_directory: "{{ .current_working_dir }}"
+action:
+  title: Release
+  description: Create new git tag with generated changelog
+  options:
+    - name: tag
+      title: Custom tag
+      type: string
+      default: ""
+    - name: preview
+      title: Preview changelog
+      description: Option to preview changelog and tag
+      type: boolean
+      default: false
+    - name: user
+      title: git user
+      default: ""
+      process:
+        - processor: keyring.GetKeyValue
+          options:
+            key: release_git_user
+    - name: password
+      title: git password
+      default: ""
+      process:
+        - processor: keyring.GetKeyValue
+          options:
+            key: release_git_password
+
+runtime:
+  type: container
+  image: platform-actions-release:latest
+  build:
+    context: ./
+    args:
+      GIT_AUTHOR_NAME: ${USER}
+      GIT_AUTHOR_EMAIL: noreply@plasma.sh
+  command:
+    - /bin/bash
+    - /action/action.sh
+    - "{{ .tag }}"
+    - "{{ .preview }}"
+    - "{{ .user }}"
+    - "{{ .password }}"
