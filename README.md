@@ -4,14 +4,14 @@ A [Launchr](https://github.com/launchrctl/launchr) plugin for [Plasmactl](https:
 
 ## Overview
 
-`plasmactl-platform` orchestrates the complete platform deployment workflow including composition, version bumping, packaging, publishing, and deployment. It integrates with CI/CD systems and provides both local and remote deployment capabilities.
+`plasmactl-platform` orchestrates the complete platform deployment workflow including composition, version bumping, packaging, releasing, and deployment. It integrates with CI/CD systems and provides both local and remote deployment capabilities.
 
 ## Features
 
-- **Multi-Step Orchestration**: Executes compose, bump, package, publish, and deploy in sequence
+- **Multi-Step Orchestration**: Executes compose, bump, package, and deploy in sequence
 - **CI/CD Integration**: Triggers pipelines in GitLab, GitHub Actions, and other systems
-- **Artifact Management**: Create and publish deployment packages
-- **Release Management**: Create git tags with changelogs
+- **Artifact Management**: Create deployment packages (.pi Plasma Images)
+- **Release Management**: Create git tags with changelogs and upload artifacts to forge releases (GitHub, GitLab, Gitea, Forgejo)
 - **Environment-Aware**: Deploy to dev, staging, production environments
 - **Chassis-Based Deployment**: Target specific platform sections
 
@@ -39,35 +39,42 @@ Options:
 - `--clean`: Clean compose working directory
 - `--debug`: Enable Ansible debug mode
 
-### platform:package
+### platform:image
 
-Create a deployment artifact (tar.gz archive):
-
-```bash
-plasmactl platform:package
-```
-
-Creates artifact in `.plasma/platform/package/artifacts/`.
-
-### platform:publish
-
-Upload artifact to repository:
+Create a Platform Image (.pi) for distribution and deployment:
 
 ```bash
-plasmactl platform:publish
+plasmactl platform:image
 ```
 
-Options:
-- `--username`: Repository username
-- `--password`: Repository password
+Creates image in `img/` directory as `{name}-{version}.pi` where version is the tag name (if on a tag) or commit SHA.
 
 ### platform:release
 
-Create a git tag with changelog:
+Create a git tag with changelog and optionally upload artifact to forge release:
 
 ```bash
-plasmactl platform:release
+# Preview changelog only
+plasmactl platform:release --preview
+
+# Create tag only (no forge release)
+plasmactl platform:release --skip-upload
+
+# Create tag and upload artifact to forge release
+plasmactl platform:release --token <your-pat>
 ```
+
+Options:
+- `--tag`: Custom version tag (default: auto-increment)
+- `--preview`: Preview changelog without creating tag
+- `--skip-upload`: Create tag only, skip forge release creation
+- `--token`: API token for forge (GitHub/GitLab/Gitea/Forgejo PAT)
+
+Supported forges (auto-detected):
+- **GitHub** (github.com and GitHub Enterprise)
+- **GitLab** (gitlab.com and self-hosted)
+- **Gitea** (gitea.com and self-hosted)
+- **Forgejo** (codeberg.org and self-hosted)
 
 ## Platform-Specific Actions
 

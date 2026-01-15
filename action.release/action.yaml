@@ -1,7 +1,7 @@
 working_directory: "{{ .current_working_dir }}"
 action:
   title: Release
-  description: Create new git tag with generated changelog
+  description: Create new git tag with generated changelog and optionally upload .pi artifact to forge release
   options:
     - name: tag
       title: Custom tag
@@ -10,6 +10,11 @@ action:
     - name: preview
       title: Preview changelog
       description: Option to preview changelog and tag
+      type: boolean
+      default: false
+    - name: skip-upload
+      title: Skip upload
+      description: Skip uploading .pi artifact to forge release (tag only)
       type: boolean
       default: false
     - name: user
@@ -26,6 +31,14 @@ action:
         - processor: keyring.GetKeyValue
           options:
             key: release_git_password
+    - name: token
+      title: Forge API token
+      description: API token for GitHub/GitLab/Gitea (PAT)
+      default: ""
+      process:
+        - processor: keyring.GetKeyValue
+          options:
+            key: release_forge_token
 
 runtime:
   type: container
@@ -42,3 +55,5 @@ runtime:
     - "{{ .preview }}"
     - "{{ .user }}"
     - "{{ .password }}"
+    - "{{ .skip-upload }}"
+    - "{{ .token }}"

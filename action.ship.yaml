@@ -1,7 +1,7 @@
 runtime: plugin
 action:
   title: Meta
-  description: "Push code + bump and deploy in CI (compose + sync + package + publish + deploy). Use: meta [flags] environment tags"
+  description: "Push code + bump and deploy in CI (compose + sync + deploy). Use: meta [flags] environment tags"
   alias:
     - deliver
   arguments:
@@ -12,6 +12,11 @@ action:
       title: Tags
       required: true
   options:
+    - name: img
+      title: Platform Image
+      description: Deploy from a Platform Image (.pi) file
+      type: string
+      default: ""
     - name: last
       title: Last
       description: Last flag for local bump command
@@ -43,7 +48,7 @@ action:
             path: platform.deploy.gitlab_domain
     - name: local
       title: Local
-      description: Execute compose + sync + package + publish + deploy locally instead of using CI
+      description: Execute compose + sync + deploy locally instead of using CI
       type: boolean
       default: false
     - name: clean

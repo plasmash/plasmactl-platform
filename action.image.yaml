@@ -1,0 +1,4 @@
+runtime: plugin
+action:
+  title: Image
+  description: "Create a Platform Image (.pi) for distribution and deployment"

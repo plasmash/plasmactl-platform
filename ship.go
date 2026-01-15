@@ -13,6 +13,7 @@ import (
 
 type shipOptions struct {
 	bin                string
+	img                string
 	last               bool
 	skipBump           bool
 	skipPrepare        bool
@@ -67,6 +68,23 @@ func (sa *shipAction) run(ctx context.Context, environment, tags string, options
 	if _, ok := sa.m.Get("platform:deploy"); !ok {
 		sa.Term().Error().Println("platform:deploy action not found - must be provided by your platform package (e.g., plasma-core)")
 		return errors.New("platform:deploy action not found")
+	}
+
+	// Deploy from Platform Image - skip compose/sync/bump/prepare
+	if options.img != "" {
+		sa.Term().Info().Printfln("Deploying from Platform Image: %s", options.img)
+
+		err := sa.executeAction(ctx, "platform:deploy", action.InputParams{
+			"environment": environment,
+			"tags":        tags,
+		}, action.InputParams{
+			"img":   options.img,
+			"debug": options.debug,
+		}, options.persistent, options.streams)
+		if err != nil {
+			return fmt.Errorf("deploy error: %w", err)
+		}
+		return nil
 	}
 
 	// platform:prepare is optional - auto-skip if not found
