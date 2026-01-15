@@ -62,6 +62,19 @@ func (sa *shipAction) run(ctx context.Context, environment, tags string, options
 		sa.Term().Info().Println("--ci option is deprecated: builds are now done by default in CI")
 	}
 
+	// Validate required actions exist in the platform package
+	// platform:deploy is mandatory - must be provided by the platform package (e.g., plasma-core)
+	if _, ok := sa.m.Get("platform:deploy"); !ok {
+		sa.Term().Error().Println("platform:deploy action not found - must be provided by your platform package (e.g., plasma-core)")
+		return errors.New("platform:deploy action not found")
+	}
+
+	// platform:prepare is optional - auto-skip if not found
+	if _, hasPrepare := sa.m.Get("platform:prepare"); !hasPrepare && !options.skipPrepare {
+		sa.Term().Info().Println("platform:prepare action not found - skipping prepare phase")
+		options.skipPrepare = true
+	}
+
 	sa.Log().Info("arguments", "environment", environment, "tags", tags)
 
 	ansibleDebug := options.debug

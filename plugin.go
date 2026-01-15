@@ -23,12 +23,6 @@ var actionPublishYaml []byte
 //go:embed action.release
 var actionReleaseFS embed.FS
 
-//go:embed action.prepare
-var actionPrepareFS embed.FS
-
-//go:embed action.deploy
-var actionDeployFS embed.FS
-
 func init() {
 	launchr.RegisterPlugin(&Plugin{})
 }
@@ -115,27 +109,9 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	}
 	actions = append(actions, releaseAction)
 
-	// platform:prepare action (prepares runtime environment)
-	prepareSubFS, err := fs.Sub(actionPrepareFS, "action.prepare")
-	if err != nil {
-		return nil, err
-	}
-	prepareAction, err := action.NewYAMLFromFS("platform:prepare", prepareSubFS)
-	if err != nil {
-		return nil, err
-	}
-	actions = append(actions, prepareAction)
-
-	// platform:deploy action (deploys to environment)
-	deploySubFS, err := fs.Sub(actionDeployFS, "action.deploy")
-	if err != nil {
-		return nil, err
-	}
-	deployAction, err := action.NewYAMLFromFS("platform:deploy", deploySubFS)
-	if err != nil {
-		return nil, err
-	}
-	actions = append(actions, deployAction)
+	// Note: platform:prepare and platform:deploy are NOT embedded here.
+	// They must be provided by the platform package (e.g., plasma-core).
+	// platform:ship validates their existence at runtime.
 
 	return actions, nil
 }
