@@ -14,11 +14,8 @@ import (
 //go:embed action.ship.yaml
 var actionShipYaml []byte
 
-//go:embed action.package.yaml
-var actionPackageYaml []byte
-
-//go:embed action.publish.yaml
-var actionPublishYaml []byte
+//go:embed action.image.yaml
+var actionImageYaml []byte
 
 //go:embed action.release
 var actionReleaseFS embed.FS
@@ -62,6 +59,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		v := launchr.Version()
 		options := shipOptions{
 			bin:                v.Name,
+			img:                input.Opt("img").(string),
 			last:               input.Opt("last").(bool),
 			skipBump:           input.Opt("skip-bump").(bool),
 			skipPrepare:        input.Opt("skip-prepare").(bool),
@@ -81,24 +79,14 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	}))
 	actions = append(actions, shipAction)
 
-	// platform:package action (creates tar.gz archive)
-	packageAction := action.NewFromYAML("platform:package", actionPackageYaml)
-	packageAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, _ *action.Action) error {
-		return createArtifact()
+	// platform:image action (creates Platform Image .pi)
+	imageAction := action.NewFromYAML("platform:image", actionImageYaml)
+	imageAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, _ *action.Action) error {
+		return createImage()
 	}))
-	actions = append(actions, packageAction)
+	actions = append(actions, imageAction)
 
-	// platform:publish action (uploads artifact to repository)
-	publishAction := action.NewFromYAML("platform:publish", actionPublishYaml)
-	publishAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
-		input := a.Input()
-		username := input.Opt("username").(string)
-		password := input.Opt("password").(string)
-		return publishArtifact(username, password, p.k)
-	}))
-	actions = append(actions, publishAction)
-
-	// platform:release action (creates git tags with changelog)
+	// platform:release action (creates git tags with changelog and uploads artifact to forge)
 	releaseSubFS, err := fs.Sub(actionReleaseFS, "action.release")
 	if err != nil {
 		return nil, err

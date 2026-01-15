@@ -8,66 +8,86 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/launchrctl/launchr"
 )
 
-func getRepoInfo() (repoName, lastCommitMessage, lastCommitShortSHA string, err error) {
+// getRepoInfo returns repository name, version (tag or commit SHA), and error
+func getRepoInfo() (repoName, version string, err error) {
 	// Open repository
 	r, err := git.PlainOpen(".")
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
-	// Get repository name
+	// Get repository name from remote URL
 	remote, err := r.Remote("origin")
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 	repoName = remote.Config().URLs[0]
 	repoName = filepath.Base(repoName)
-	repoName = repoName[:len(repoName)-4]
+	repoName = strings.TrimSuffix(repoName, ".git")
 
-	// Get last commit information
-	ref, err := r.Head()
+	// Get HEAD reference
+	head, err := r.Head()
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
-	commit, err := r.CommitObject(ref.Hash())
-	if err != nil {
-		return "", "", "", err
-	}
-	lastCommitMessage = commit.Message
-	lastCommitShortSHA = ref.Hash().String()[:7]
 
-	return repoName, lastCommitMessage, lastCommitShortSHA, nil
+	// Check if HEAD points to a tag
+	tags, err := r.Tags()
+	if err != nil {
+		return "", "", err
+	}
+
+	var tagName string
+	err = tags.ForEach(func(ref *plumbing.Reference) error {
+		if ref.Hash() == head.Hash() {
+			tagName = ref.Name().Short()
+			return fmt.Errorf("found") // Break iteration
+		}
+		return nil
+	})
+
+	if tagName != "" {
+		// HEAD is on a tag, use tag name as version
+		version = tagName
+	} else {
+		// Not on a tag, use short commit SHA
+		version = head.Hash().String()[:7]
+	}
+
+	return repoName, version, nil
 }
 
-// createArtifact creates a tar.gz archive of the current repository for publishing
-func createArtifact() error {
+// createImage creates a Platform Image (.pi) archive
+func createImage() error {
 	// Get repository information
-	repoName, _, lastCommitShortSHA, err := getRepoInfo()
+	repoName, version, err := getRepoInfo()
 	if err != nil {
 		launchr.Log().Error("error", "error", err)
 		return fmt.Errorf("error getting repository information: %w", err)
 	}
 
-	// Construct artifact file name
-	archiveFile := fmt.Sprintf("%s-%s-plasma-src.tar.gz", repoName, lastCommitShortSHA)
+	// Construct image file name: {name}-{version}.pi
+	imageFile := fmt.Sprintf("%s-%s.pi", repoName, version)
 
-	// Variables - use .plasma/platform/package structure
+	// Variables - output to img directory at project root (like src)
 	srcDir := "."
-	archiveTempDir := ".plasma/platform/package/tmp"
-	archiveFinalDir := ".plasma/platform/package/artifacts"
+	imageTempDir := "img/.tmp"
+	imageFinalDir := "img"
 
-	launchr.Term().Printfln("Creating artifact %s...", archiveFile)
-	err = createArchive(srcDir, archiveTempDir, archiveFinalDir, archiveFile)
+	launchr.Term().Printfln("Creating Platform Image %s...", imageFile)
+	err = createArchive(srcDir, imageTempDir, imageFinalDir, imageFile)
 	if err != nil {
-		return fmt.Errorf("error creating archive: %w", err)
+		return fmt.Errorf("error creating image: %w", err)
 	}
 
-	launchr.Term().Success().Printfln("Artifact created: %s/%s", archiveFinalDir, archiveFile)
+	launchr.Term().Success().Printfln("Platform Image created: %s/%s", imageFinalDir, imageFile)
 	return nil
 }
 
@@ -98,6 +118,7 @@ func createArchive(srcDir, archiveTempDir, archiveFinalDir, archiveDestFile stri
 		".compose":   true,
 		".plasma":    true,
 		".plasmactl": true,
+		"img":        true,
 	}
 
 	err = filepath.Walk(srcDir, func(fpath string, info os.FileInfo, err error) error {
@@ -176,7 +197,7 @@ func createArchive(srcDir, archiveTempDir, archiveFinalDir, archiveDestFile stri
 		return fmt.Errorf("error closing gzip writer: %v", err)
 	}
 
-	// Copy archive to artifact directory
+	// Copy archive to final directory
 	srcFile, err := os.Open(path.Clean(archivePath))
 	if err != nil {
 		return fmt.Errorf("error opening archive file: %v", err)
@@ -185,15 +206,15 @@ func createArchive(srcDir, archiveTempDir, archiveFinalDir, archiveDestFile stri
 
 	destFile, err := os.Create(path.Clean(artifactPath))
 	if err != nil {
-		return fmt.Errorf("error creating artifact file: %v", err)
+		return fmt.Errorf("error creating image file: %v", err)
 	}
 	defer destFile.Close()
 
 	if _, err := io.Copy(destFile, srcFile); err != nil {
-		return fmt.Errorf("error copying archive to artifact directory: %v", err)
+		return fmt.Errorf("error copying archive to image directory: %v", err)
 	}
 
-	// Delete temp file from archive temp directory.
+	// Delete temp file
 	if err := os.Remove(path.Clean(archivePath)); err != nil {
 		return fmt.Errorf("error deleting temp file: %v", err)
 	}
