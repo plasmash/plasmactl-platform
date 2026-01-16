@@ -1,7 +1,7 @@
 working_directory: "{{ .current_working_dir }}"
 action:
   title: Release
-  description: Create new git tag with generated changelog and optionally upload .pi artifact to forge release
+  description: "Create git tag with changelog, optionally upload .pi to GitHub/GitLab/Gitea release"
   options:
     - name: tag
       title: Custom tag
