@@ -82,7 +82,9 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	// platform:image action (creates Platform Image .pi)
 	imageAction := action.NewFromYAML("platform:image", actionImageYaml)
 	imageAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, _ *action.Action) error {
-		return createImage()
+		// Check if platform:prepare action exists to determine source directory
+		_, hasPrepare := p.m.Get("platform:prepare")
+		return createImage(hasPrepare)
 	}))
 	actions = append(actions, imageAction)
 
