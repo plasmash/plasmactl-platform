@@ -41,6 +41,6 @@ runtime:
     - /bin/bash
     - /action/action.sh
     - "{{ .version }}"
-    - "{{ .dry-run }}"
-    - "{{ .tag-only }}"
+    - "{{ .dry_run }}"
+    - "{{ .tag_only }}"
     - "{{ .token }}"
