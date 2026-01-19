@@ -65,7 +65,8 @@ func getRepoInfo() (repoName, version string, err error) {
 }
 
 // createImage creates a Platform Image (.pi) archive
-func createImage() error {
+// hasPrepareAction indicates whether platform:prepare action is available
+func createImage(hasPrepareAction bool) error {
 	// Get repository information
 	repoName, version, err := getRepoInfo()
 	if err != nil {
@@ -76,12 +77,30 @@ func createImage() error {
 	// Construct image file name: {name}-{version}.pi
 	imageFile := fmt.Sprintf("%s-%s.pi", repoName, version)
 
-	// Variables - output to img directory at project root (like src)
-	srcDir := "."
+	// Determine source directory based on prepare action availability
+	prepareDir := ".plasma/prepare"
+	composeDir := ".plasma/package/compose/merged"
+	var srcDir string
+
+	if hasPrepareAction {
+		// prepare action exists - must use prepare output for deployable image
+		if _, err := os.Stat(prepareDir); os.IsNotExist(err) {
+			return fmt.Errorf("platform:prepare action exists but %s not found: run platform:prepare first", prepareDir)
+		}
+		srcDir = prepareDir
+	} else {
+		// prepare action doesn't exist - use compose output directly
+		if _, err := os.Stat(composeDir); os.IsNotExist(err) {
+			return fmt.Errorf("no source directory found: run package:compose first")
+		}
+		srcDir = composeDir
+	}
+
+	// Output to img/ - visible to users as final distributable artifact
 	imageTempDir := "img/.tmp"
 	imageFinalDir := "img"
 
-	launchr.Term().Printfln("Creating Platform Image %s...", imageFile)
+	launchr.Term().Printfln("Creating Platform Image %s from %s...", imageFile, srcDir)
 	err = createArchive(srcDir, imageTempDir, imageFinalDir, imageFile)
 	if err != nil {
 		return fmt.Errorf("error creating image: %w", err)
@@ -113,25 +132,9 @@ func createArchive(srcDir, archiveTempDir, archiveFinalDir, archiveDestFile stri
 
 	tw := tar.NewWriter(gw)
 
-	excludeDirs := map[string]bool{
-		".git":       true,
-		".compose":   true,
-		".plasma":    true,
-		".plasmactl": true,
-		"img":        true,
-	}
-
 	err = filepath.Walk(srcDir, func(fpath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
-		}
-
-		// Skip excluded directories
-		if excludeDirs[info.Name()] {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
 		}
 
 		// Construct the relative path
