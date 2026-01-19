@@ -66,8 +66,7 @@ func (sa *shipAction) run(ctx context.Context, environment, tags string, options
 	// Validate required actions exist in the platform package
 	// platform:deploy is mandatory - must be provided by the platform package (e.g., plasma-core)
 	if _, ok := sa.m.Get("platform:deploy"); !ok {
-		sa.Term().Error().Println("platform:deploy action not found - must be provided by your platform package (e.g., plasma-core)")
-		return errors.New("platform:deploy action not found")
+		return errors.New("platform:deploy action not found - must be provided by your platform package (e.g., plasma-core)")
 	}
 
 	// Deploy from Platform Image - skip compose/sync/bump/prepare
