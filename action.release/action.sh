@@ -45,9 +45,9 @@ remote_exists() {
 # Function to ensure latest tags are available from remote
 ensure_latest_tags() {
   if remote_exists; then
-    echo "Fetching latest tags from remote..." >&2
+    echo "Fetching latest tags from remote..."
     if git fetch --tags origin 2>/dev/null; then
-      echo "Tags synchronized with remote." >&2
+      echo "Tags synchronized with remote."
       return 0
     else
       echo "Warning: Failed to fetch tags from remote." >&2
@@ -451,50 +451,111 @@ find_image() {
   echo "$image"
 }
 
+# Resolve token from argument, env vars, or fail
+resolve_token() {
+  local arg_token=$1
+  local forge_type=$2
+
+  # 1. Use argument if provided
+  if [[ -n "$arg_token" ]]; then
+    echo "$arg_token"
+    return 0
+  fi
+
+  # 2. Try forge-specific env var
+  case "$forge_type" in
+    github)
+      if [[ -n "$GITHUB_TOKEN" ]]; then
+        echo "$GITHUB_TOKEN"
+        return 0
+      fi
+      ;;
+    gitlab)
+      if [[ -n "$GITLAB_TOKEN" ]]; then
+        echo "$GITLAB_TOKEN"
+        return 0
+      fi
+      ;;
+    gitea|forgejo)
+      if [[ -n "$GITEA_TOKEN" ]]; then
+        echo "$GITEA_TOKEN"
+        return 0
+      fi
+      ;;
+  esac
+
+  # 3. No token found
+  echo ""
+  return 1
+}
+
+# Calculate new version based on bump type
+calculate_new_version() {
+  local latest_tag=$1
+  local bump_type=$2
+
+  local starts_with_v=false
+  if [[ ${latest_tag:0:1} == "v" ]]; then
+    starts_with_v=true
+  fi
+
+  # Strip v prefix for calculation
+  local version=${latest_tag#v}
+
+  local major minor patch
+  major=$(echo "$version" | cut -d'.' -f1)
+  minor=$(echo "$version" | cut -d'.' -f2)
+  patch=$(echo "$version" | cut -d'.' -f3)
+
+  case "$bump_type" in
+    patch)
+      patch=$((patch + 1))
+      ;;
+    minor)
+      minor=$((minor + 1))
+      patch=0
+      ;;
+    major)
+      major=$((major + 1))
+      minor=0
+      patch=0
+      ;;
+  esac
+
+  local new_version="${major}.${minor}.${patch}"
+
+  # Restore v prefix if original had it
+  if $starts_with_v; then
+    new_version="v${new_version}"
+  fi
+
+  echo "$new_version"
+}
+
 # Main script
-CUSTOM_TAG=${1}
-PREVIEW=${2:-false}
-USERNAME=${3}
-PASSWORD=${4}
-SKIP_UPLOAD=${5:-false}
-TOKEN=${6}
-
-# Create temporary askpass script
-ASKPASS_SCRIPT=$(mktemp)
-cat > "$ASKPASS_SCRIPT" << EOF
-#!/bin/bash
-case "\$1" in
-    *Username*) echo "$USERNAME" ;;
-    *Password*) echo "$PASSWORD" ;;
-esac
-EOF
-
-chmod +x "$ASKPASS_SCRIPT"
-
-# Export the askpass script
-export GIT_ASKPASS="$ASKPASS_SCRIPT"
+VERSION=${1}
+DRY_RUN=${2:-false}
+TAG_ONLY=${3:-false}
+TOKEN=${4}
 
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 # Check if the current branch is master or main
-if [ "$current_branch" != "master" ] && [ "$current_branch" != "main" ]
-then
-  echo -e "\nError: Current branch is neither 'master' nor 'main', please switch current branch.\n"
+if [ "$current_branch" != "master" ] && [ "$current_branch" != "main" ]; then
+  echo "Error: Current branch is '$current_branch', must be 'master' or 'main'."
   exit 1
 fi
 
 ensure_latest_tags
 latest_tag=$(semver_get_latest)
 if [[ -z "${latest_tag}" ]]; then
-  echo "No valid SemVer tags found. Creating initial tag..."
-
+  echo "No valid SemVer tags found. Will create initial release."
   latest_tag="$INITIAL_TAG"
-  echo "Using initial tag: $latest_tag"
-else
-  echo -e "\nLast tag is: $latest_tag\n"
 fi
 
+echo "Latest tag: $latest_tag"
+
 # Generate changelog with git-cliff
-if [[ "$latest_tag" == $INITIAL_TAG ]]; then
+if [[ "$latest_tag" == "$INITIAL_TAG" ]]; then
   # For initial tag, get all commits
   changelog="$(git cliff --config /action/config.toml)"
 else
@@ -502,111 +563,87 @@ else
 fi
 changelog=$(echo "${changelog}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
-if [[ -z "${changelog}" && "$latest_tag" != $INITIAL_TAG ]]; then
-  echo "Changelog is empty. Please ensure you have new commits outside latest tag"
+if [[ -z "${changelog}" && "$latest_tag" != "$INITIAL_TAG" ]]; then
+  echo "No changes since $latest_tag. Nothing to release."
   exit 0
 fi
 
-echo -e "$changelog\n"
+echo ""
+echo "$changelog"
+echo ""
 
-if [ "$PREVIEW" = true ]; then
-  exit 0
-fi
-
-# Use custom tag or provide choice for user to update.
-if [[ -n "${CUSTOM_TAG}" ]]; then
-  NEW_TAG=${CUSTOM_TAG}
-else
-  # Handle initial tag case
-  if [[ "$latest_tag" == $INITIAL_TAG ]]; then
-    # Creating initial release tag
+# Determine new version
+if [[ -z "$VERSION" ]]; then
+  # Interactive mode - prompt for bump type
+  if [[ "$latest_tag" == "$INITIAL_TAG" ]]; then
     NEW_TAG="0.1.0"
+    echo "Creating initial release: $NEW_TAG"
   else
-    if [[ ${latest_tag:0:1} == "v" ]]; then
-      starts_with_v=true
-    else
-      starts_with_v=false
-    fi
+    PS3=$'\nSelect release type: '
+    options=("patch" "minor" "major")
 
-    # strip V from tag
-    major=$(echo "$latest_tag" | cut -d'.' -f1)
-    major=${major#v}
-
-    minor=$(echo "$latest_tag" | cut -d'.' -f2)
-    patch=$(echo "$latest_tag" | cut -d'.' -f3)
-
-    patch_tag="${major}.${minor}.$((patch + 1))"
-    minor_tag="${major}.$((minor + 1)).0"
-    major_tag="$((major + 1)).0.0"
-
-    # return V to tag if any
-    if $starts_with_v; then
-      patch_tag="v${patch_tag}"
-      minor_tag="v${minor_tag}"
-      major_tag="v${major_tag}"
-    fi
-
-    PS3=$'\nPlease enter your choice: '
-    options=("Fix: Safe to upgrade, bugfixes ($patch_tag)" "Feature: Safe to update, new features ($minor_tag)" "Breaking: Not safe to update ($major_tag)")
     on_interrupt() {
-      echo -e "\nInterrupted by user, quiting..."
+      echo -e "\nInterrupted."
       exit 0
     }
-
     trap on_interrupt INT
 
-    select opt in "${options[@]}"
-    do
+    select opt in "${options[@]}"; do
       case $opt in
-           "${options[0]}")
-              echo "Incrementing patch level"
-              NEW_TAG=$patch_tag
-              break
-              ;;
-          "${options[1]}")
-              echo "Incrementing minor version and reset patch level"
-              NEW_TAG=$minor_tag
-              break
-              ;;
-          "${options[2]}")
-              echo "Incrementing major version and reset minor and patch level"
-              NEW_TAG=$major_tag
-              break
-              ;;
-          *)
-              echo "Invalid option $REPLY"
-              exit 1
-              ;;
-            esac
-      done
+        patch|minor|major)
+          NEW_TAG=$(calculate_new_version "$latest_tag" "$opt")
+          break
+          ;;
+        *)
+          echo "Invalid option"
+          exit 1
+          ;;
+      esac
+    done
   fi
+elif [[ "$VERSION" =~ ^(patch|minor|major)$ ]]; then
+  # Bump type provided
+  if [[ "$latest_tag" == "$INITIAL_TAG" ]]; then
+    NEW_TAG="0.1.0"
+  else
+    NEW_TAG=$(calculate_new_version "$latest_tag" "$VERSION")
+  fi
+else
+  # Explicit version provided
+  NEW_TAG="$VERSION"
 fi
 
-echo "Creating tag: ${NEW_TAG}"
-# Creation of new tag including changelog as description
-git tag -f -a $NEW_TAG -m "$changelog"
-echo "Press 'Enter' to push new tag to repo"
-read -r
-git push origin tag $NEW_TAG
+echo "New version: $NEW_TAG"
 
-# Clean up askpass
-rm -f "$ASKPASS_SCRIPT"
-unset GIT_ASKPASS
-
-# Handle forge release and artifact upload
-if [ "$SKIP_UPLOAD" = true ]; then
-  echo -e "\n--skip-upload specified, skipping forge release creation"
+# Dry run - stop here
+if [ "$DRY_RUN" = true ]; then
+  echo ""
+  echo "Dry run - no changes made."
+  echo "Would create tag: $NEW_TAG"
+  if [ "$TAG_ONLY" = true ]; then
+    echo "Would push tag only (no forge release)"
+  else
+    echo "Would create forge release and upload .pi"
+  fi
   exit 0
 fi
 
-# Check for token
-if [[ -z "$TOKEN" ]]; then
-  echo -e "\nNo API token provided. Skipping forge release creation."
-  echo "To create a forge release with artifact upload, provide --token or configure 'release_forge_token' in keyring."
+# Create and push tag
+echo ""
+echo "Creating tag: $NEW_TAG"
+git tag -f -a "$NEW_TAG" -m "$changelog"
+
+echo "Pushing tag to origin..."
+git push origin tag "$NEW_TAG"
+
+# Tag only mode - stop here
+if [ "$TAG_ONLY" = true ]; then
+  echo ""
+  echo "Tag $NEW_TAG created and pushed."
   exit 0
 fi
 
-# Detect forge and create release
+# Detect forge and resolve token
 REMOTE_HOST=$(get_remote_host)
 REMOTE_REPO=$(get_remote_repo)
 
@@ -615,27 +652,52 @@ if [[ -z "$REMOTE_HOST" ]] || [[ -z "$REMOTE_REPO" ]]; then
   exit 1
 fi
 
-echo -e "\nDetecting forge type for $REMOTE_HOST..."
+echo ""
+echo "Detecting forge type for $REMOTE_HOST..."
 FORGE_TYPE=$(detect_forge "$REMOTE_HOST" "$TOKEN")
 echo "Detected forge: $FORGE_TYPE"
 
 if [[ "$FORGE_TYPE" == "unknown" ]]; then
   echo "Error: Could not detect forge type for $REMOTE_HOST" >&2
-  echo "Please ensure the host is accessible and supports GitHub/GitLab/Gitea/Forgejo API" >&2
+  echo "Supported forges: GitHub, GitLab, Gitea, Forgejo" >&2
+  exit 1
+fi
+
+# Resolve token
+RESOLVED_TOKEN=$(resolve_token "$TOKEN" "$FORGE_TYPE")
+if [[ -z "$RESOLVED_TOKEN" ]]; then
+  echo ""
+  echo "Error: No API token available for $FORGE_TYPE" >&2
+  echo ""
+  echo "Provide a token via one of:" >&2
+  echo "  --token <token>" >&2
+  case "$FORGE_TYPE" in
+    github)
+      echo "  GITHUB_TOKEN environment variable" >&2
+      ;;
+    gitlab)
+      echo "  GITLAB_TOKEN environment variable" >&2
+      ;;
+    gitea|forgejo)
+      echo "  GITEA_TOKEN environment variable" >&2
+      ;;
+  esac
+  echo "  plasmactl keyring:set release_forge_token" >&2
   exit 1
 fi
 
 # Create release on forge
+echo ""
 RELEASE_ID=""
 case "$FORGE_TYPE" in
   github)
-    RELEASE_ID=$(create_github_release "$REMOTE_HOST" "$REMOTE_REPO" "$NEW_TAG" "$changelog" "$TOKEN")
+    RELEASE_ID=$(create_github_release "$REMOTE_HOST" "$REMOTE_REPO" "$NEW_TAG" "$changelog" "$RESOLVED_TOKEN")
     ;;
   gitlab)
-    RELEASE_ID=$(create_gitlab_release "$REMOTE_HOST" "$REMOTE_REPO" "$NEW_TAG" "$changelog" "$TOKEN")
+    RELEASE_ID=$(create_gitlab_release "$REMOTE_HOST" "$REMOTE_REPO" "$NEW_TAG" "$changelog" "$RESOLVED_TOKEN")
     ;;
   gitea|forgejo)
-    RELEASE_ID=$(create_gitea_release "$REMOTE_HOST" "$REMOTE_REPO" "$NEW_TAG" "$changelog" "$TOKEN")
+    RELEASE_ID=$(create_gitea_release "$REMOTE_HOST" "$REMOTE_REPO" "$NEW_TAG" "$changelog" "$RESOLVED_TOKEN")
     ;;
 esac
 
@@ -644,28 +706,32 @@ if [[ -z "$RELEASE_ID" ]]; then
   exit 1
 fi
 
-echo "Release created successfully (ID/Tag: $RELEASE_ID)"
+echo "Release created (ID: $RELEASE_ID)"
 
 # Find and upload Platform Image
 IMAGE=$(find_image)
 if [[ -z "$IMAGE" ]]; then
-  echo -e "\nNo Platform Image (.pi) found in $IMAGE_DIR"
-  echo "Run 'plasmactl platform:image' first to create an image, or use --skip-upload"
+  echo ""
+  echo "No Platform Image (.pi) found in $IMAGE_DIR - skipping artifact upload."
+  echo ""
+  echo "Release $NEW_TAG created successfully."
   exit 0
 fi
 
-echo -e "\nFound Platform Image: $IMAGE"
+echo ""
+echo "Uploading Platform Image: $IMAGE"
 
 case "$FORGE_TYPE" in
   github)
-    upload_github_asset "$REMOTE_HOST" "$REMOTE_REPO" "$RELEASE_ID" "$IMAGE" "$TOKEN"
+    upload_github_asset "$REMOTE_HOST" "$REMOTE_REPO" "$RELEASE_ID" "$IMAGE" "$RESOLVED_TOKEN"
     ;;
   gitlab)
-    upload_gitlab_asset "$REMOTE_HOST" "$REMOTE_REPO" "$NEW_TAG" "$IMAGE" "$TOKEN"
+    upload_gitlab_asset "$REMOTE_HOST" "$REMOTE_REPO" "$NEW_TAG" "$IMAGE" "$RESOLVED_TOKEN"
     ;;
   gitea|forgejo)
-    upload_gitea_asset "$REMOTE_HOST" "$REMOTE_REPO" "$RELEASE_ID" "$IMAGE" "$TOKEN"
+    upload_gitea_asset "$REMOTE_HOST" "$REMOTE_REPO" "$RELEASE_ID" "$IMAGE" "$RESOLVED_TOKEN"
     ;;
 esac
 
-echo -e "\nRelease $NEW_TAG created successfully with Platform Image!"
+echo ""
+echo "Release $NEW_TAG created successfully with Platform Image!"

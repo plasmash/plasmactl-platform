@@ -1,44 +1,33 @@
 working_directory: "{{ .current_working_dir }}"
 action:
   title: Release
-  description: "Create git tag with changelog, optionally upload .pi to GitHub/GitLab/Gitea release"
-  options:
-    - name: tag
-      title: Custom tag
+  description: "Create git tag with changelog and forge release"
+  arguments:
+    - name: version
+      title: Version
+      description: "Bump type (patch, minor, major) or explicit version (v1.2.3). Interactive prompt if omitted."
       type: string
       default: ""
-    - name: preview
-      title: Preview changelog
-      description: Option to preview changelog and tag
+  options:
+    - name: dry-run
+      title: Dry run
+      description: Preview changelog and actions without making changes
       type: boolean
       default: false
-    - name: skip-upload
-      title: Skip upload
-      description: Skip uploading .pi artifact to forge release (tag only)
+    - name: tag-only
+      title: Tag only
+      description: Create and push git tag only, skip forge release
       type: boolean
       default: false
-    - name: user
-      title: git user
-      default: ""
-      process:
-        - processor: keyring.GetKeyValue
-          options:
-            key: release_git_user
-    - name: password
-      title: git password
-      default: ""
-      process:
-        - processor: keyring.GetKeyValue
-          options:
-            key: release_git_password
     - name: token
       title: Forge API token
-      description: API token for GitHub/GitLab/Gitea (PAT)
+      description: "API token for GitHub/GitLab/Gitea. Falls back to GITHUB_TOKEN/GITLAB_TOKEN/GITEA_TOKEN env vars, then keyring."
       default: ""
       process:
         - processor: keyring.GetKeyValue
           options:
             key: release_forge_token
+            optional: true
 
 runtime:
   type: container
@@ -51,9 +40,7 @@ runtime:
   command:
     - /bin/bash
     - /action/action.sh
-    - "{{ .tag }}"
-    - "{{ .preview }}"
-    - "{{ .user }}"
-    - "{{ .password }}"
-    - "{{ .skip-upload }}"
+    - "{{ .version }}"
+    - "{{ .dry-run }}"
+    - "{{ .tag-only }}"
     - "{{ .token }}"
