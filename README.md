@@ -43,8 +43,6 @@ Options:
 - `--debug`: Enable Ansible debug mode
 - `--img`: Deploy from a Platform Image (.pi) file
 
-Aliases: `ship`
-
 #### platform:create
 
 Create a new platform scaffold with DNS configuration:
