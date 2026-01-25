@@ -11,7 +11,7 @@ import (
 	"github.com/launchrctl/launchr/pkg/action"
 )
 
-type shipOptions struct {
+type upOptions struct {
 	bin                string
 	img                string
 	last               bool
@@ -28,17 +28,17 @@ type shipOptions struct {
 	persistent         action.InputParams
 }
 
-type shipAction struct {
+type upAction struct {
 	action.WithLogger
 	action.WithTerm
 
 	k  keyring.Keyring
 	m  action.Manager
-	g  *gitShip
+	g  *gitUp
 	ci *continuousIntegration
 }
 
-func newShipAction(a *action.Action, k keyring.Keyring, m action.Manager) *shipAction {
+func newUpAction(a *action.Action, k keyring.Keyring, m action.Manager) *upAction {
 	log := launchr.Log()
 	if rt, ok := a.Runtime().(action.RuntimeLoggerAware); ok {
 		log = rt.LogWith()
@@ -49,16 +49,16 @@ func newShipAction(a *action.Action, k keyring.Keyring, m action.Manager) *shipA
 		term = rt.Term()
 	}
 
-	ship := &shipAction{k: k, m: m}
-	ship.SetLogger(log)
-	ship.SetTerm(term)
+	up := &upAction{k: k, m: m}
+	up.SetLogger(log)
+	up.SetTerm(term)
 
-	ship.g = &gitShip{WithLogger: ship.WithLogger, WithTerm: ship.WithTerm}
-	ship.ci = &continuousIntegration{WithLogger: ship.WithLogger, WithTerm: ship.WithTerm}
-	return ship
+	up.g = &gitUp{WithLogger: up.WithLogger, WithTerm: up.WithTerm}
+	up.ci = &continuousIntegration{WithLogger: up.WithLogger, WithTerm: up.WithTerm}
+	return up
 }
 
-func (sa *shipAction) run(ctx context.Context, environment, tags string, options shipOptions) error {
+func (sa *upAction) run(ctx context.Context, environment, tags string, options upOptions) error {
 	if options.ci {
 		sa.Term().Info().Println("--ci option is deprecated: builds are now done by default in CI")
 	}
@@ -256,7 +256,7 @@ func (sa *shipAction) run(ctx context.Context, environment, tags string, options
 	return nil
 }
 
-func (sa *shipAction) executeAction(ctx context.Context, id string, args, opts, persistent action.InputParams, streams launchr.Streams) error {
+func (sa *upAction) executeAction(ctx context.Context, id string, args, opts, persistent action.InputParams, streams launchr.Streams) error {
 	a, ok := sa.m.Get(id)
 	if !ok {
 		return fmt.Errorf("action %q was not found", id)
@@ -286,7 +286,7 @@ func (sa *shipAction) executeAction(ctx context.Context, id string, args, opts, 
 	return nil
 }
 
-func (sa *shipAction) getCredentials(url, username, password string) (keyring.CredentialsItem, bool, error) {
+func (sa *upAction) getCredentials(url, username, password string) (keyring.CredentialsItem, bool, error) {
 	ci, err := sa.k.GetForURL(url)
 	save := false
 	if err != nil {
