@@ -13,13 +13,13 @@ import (
 	"github.com/launchrctl/launchr/pkg/action"
 )
 
-type gitShip struct {
+type gitUp struct {
 	action.WithLogger
 	action.WithTerm
 }
 
 // Checks for uncommitted changes and creates a commit if any are found
-func (g *gitShip) commitChangesIfAny() error {
+func (g *gitUp) commitChangesIfAny() error {
 	// Open the existing repository
 	repoPath, err := os.Getwd()
 	if err != nil {
@@ -85,7 +85,7 @@ func (g *gitShip) commitChangesIfAny() error {
 }
 
 // Checks for unpushed commits and pushes them if any are found
-func (g *gitShip) pushCommitsIfAny() error {
+func (g *gitUp) pushCommitsIfAny() error {
 
 	// Check for un-pushed commits
 	cmdFetch := exec.Command("git", "fetch", "--quiet")
@@ -120,7 +120,7 @@ func (g *gitShip) pushCommitsIfAny() error {
 	return nil
 }
 
-func (g *gitShip) pushBranchIfNotRemote() error {
+func (g *gitUp) pushBranchIfNotRemote() error {
 	// Verify the remote name
 	cmdRemote := exec.Command("git", "remote")
 	var remoteOut bytes.Buffer

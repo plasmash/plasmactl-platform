@@ -83,7 +83,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		env := input.Arg("environment").(string)
 		tags := input.Arg("tags").(string)
 		v := launchr.Version()
-		options := shipOptions{
+		options := upOptions{
 			bin:                v.Name,
 			img:                input.Opt("img").(string),
 			last:               input.Opt("last").(bool),
@@ -100,8 +100,8 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 			persistent:         a.Input().GroupFlags(p.m.GetPersistentFlags().GetName()),
 		}
 
-		ship := newShipAction(a, p.k, p.m)
-		return ship.run(ctx, env, tags, options)
+		up := newUpAction(a, p.k, p.m)
+		return up.run(ctx, env, tags, options)
 	}))
 	actions = append(actions, upAction)
 
@@ -307,7 +307,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 
 	// Note: platform:prepare is NOT embedded here.
 	// It must be provided by plasmactl-model plugin.
-	// platform:ship validates its existence at runtime.
+	// platform:up validates its existence at runtime.
 
 	return actions, nil
 }
