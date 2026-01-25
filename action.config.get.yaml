@@ -13,9 +13,9 @@ action:
       description: Get from encrypted vault (secrets)
       type: bool
       default: false
-    - name: platform
-      shorthand: p
-      title: Platform
-      description: Platform name (defaults to current environment)
+    - name: chassis
+      shorthand: c
+      title: Chassis
+      description: Chassis name (e.g., platform.foundation.cluster)
       type: string
-      default: ""
+      required: true

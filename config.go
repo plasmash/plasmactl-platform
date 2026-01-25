@@ -12,25 +12,49 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// resolveChassisConfigDir finds the configuration directory for a chassis
+// Chassis configs are stored in src/{layer}/cfg/{chassis}/
+func resolveChassisConfigDir(chassis string) (string, error) {
+	if chassis == "" {
+		return "", fmt.Errorf("chassis name is required")
+	}
+
+	// Parse chassis name to extract layer
+	// Example: platform.foundation.cluster -> foundation
+	parts := strings.Split(chassis, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid chassis name %q (expected format: platform.{layer}.{...})", chassis)
+	}
+
+	layer := parts[1] // e.g., "foundation", "integration", "cognition"
+
+	configDir := filepath.Join("src", layer, "cfg", chassis)
+	if _, err := os.Stat(configDir); err == nil {
+		return configDir, nil
+	}
+
+	return "", fmt.Errorf("chassis config directory not found: %s", configDir)
+}
+
 // cfgGet implements the config:get command
 type cfgGet struct {
-	log      *launchr.Logger
-	term     *launchr.Terminal
-	key      string
-	vault    bool
-	platform string
+	log     *launchr.Logger
+	term    *launchr.Terminal
+	key     string
+	vault   bool
+	chassis string
 }
 
 func (a *cfgGet) SetLogger(log *launchr.Logger) { a.log = log }
 func (a *cfgGet) SetTerm(term *launchr.Terminal) { a.term = term }
 
 func (a *cfgGet) Execute() error {
-	configDir, err := a.resolveConfigDir()
+	configDir, err := resolveChassisConfigDir(a.chassis)
 	if err != nil {
 		return err
 	}
 
-	filename := "values.yaml"
+	filename := "vars.yaml"
 	if a.vault {
 		filename = "vault.yaml"
 	}
@@ -59,52 +83,35 @@ func (a *cfgGet) Execute() error {
 	return nil
 }
 
-func (a *cfgGet) resolveConfigDir() (string, error) {
-	// If platform specified, use inst/{platform}/config or src/{layer}/config
-	if a.platform != "" {
-		envConfig := filepath.Join("inst", a.platform, "config")
-		if _, err := os.Stat(envConfig); err == nil {
-			return envConfig, nil
-		}
-	}
-
-	// Fall back to src/platform/config or similar
-	srcConfig := "src/platform/config"
-	if _, err := os.Stat(srcConfig); err == nil {
-		return srcConfig, nil
-	}
-
-	return "", fmt.Errorf("config directory not found")
-}
-
 // cfgSet implements the config:set command
 type cfgSet struct {
-	log      *launchr.Logger
-	term     *launchr.Terminal
-	key      string
-	value    string
-	vault    bool
-	platform string
+	log     *launchr.Logger
+	term    *launchr.Terminal
+	key     string
+	value   string
+	vault   bool
+	chassis string
 }
 
 func (a *cfgSet) SetLogger(log *launchr.Logger) { a.log = log }
 func (a *cfgSet) SetTerm(term *launchr.Terminal) { a.term = term }
 
 func (a *cfgSet) Execute() error {
-	configDir, err := a.resolveConfigDir()
+	configDir, err := resolveChassisConfigDir(a.chassis)
 	if err != nil {
 		// Create config directory if it doesn't exist
-		if a.platform != "" {
-			configDir = filepath.Join("inst", a.platform, "config")
-		} else {
-			configDir = "src/platform/config"
+		parts := strings.Split(a.chassis, ".")
+		if len(parts) < 2 {
+			return fmt.Errorf("invalid chassis name %q", a.chassis)
 		}
+		layer := parts[1]
+		configDir = filepath.Join("src", layer, "cfg", a.chassis)
 		if err := os.MkdirAll(configDir, 0755); err != nil {
 			return fmt.Errorf("failed to create config directory: %w", err)
 		}
 	}
 
-	filename := "values.yaml"
+	filename := "vars.yaml"
 	if a.vault {
 		filename = "vault.yaml"
 	}
@@ -135,29 +142,13 @@ func (a *cfgSet) Execute() error {
 	return nil
 }
 
-func (a *cfgSet) resolveConfigDir() (string, error) {
-	if a.platform != "" {
-		envConfig := filepath.Join("inst", a.platform, "config")
-		if _, err := os.Stat(envConfig); err == nil {
-			return envConfig, nil
-		}
-	}
-
-	srcConfig := "src/platform/config"
-	if _, err := os.Stat(srcConfig); err == nil {
-		return srcConfig, nil
-	}
-
-	return "", fmt.Errorf("config directory not found")
-}
-
 // cfgList implements the config:list command
 type cfgList struct {
 	log       *launchr.Logger
 	term      *launchr.Terminal
 	component string
 	vault     bool
-	platform  string
+	chassis   string
 	format    string
 }
 
@@ -165,7 +156,7 @@ func (a *cfgList) SetLogger(log *launchr.Logger) { a.log = log }
 func (a *cfgList) SetTerm(term *launchr.Terminal) { a.term = term }
 
 func (a *cfgList) Execute() error {
-	configDir, err := a.resolveConfigDir()
+	configDir, err := resolveChassisConfigDir(a.chassis)
 	if err != nil {
 		a.term.Info().Println("No configuration found")
 		return nil
@@ -173,8 +164,8 @@ func (a *cfgList) Execute() error {
 
 	result := make(map[string]interface{})
 
-	// Read values.yaml
-	valuesFile := filepath.Join(configDir, "values.yaml")
+	// Read vars.yaml
+	valuesFile := filepath.Join(configDir, "vars.yaml")
 	if data, err := os.ReadFile(valuesFile); err == nil {
 		var values map[string]interface{}
 		if err := yaml.Unmarshal(data, &values); err == nil {
@@ -226,28 +217,12 @@ func (a *cfgList) Execute() error {
 	return nil
 }
 
-func (a *cfgList) resolveConfigDir() (string, error) {
-	if a.platform != "" {
-		envConfig := filepath.Join("inst", a.platform, "config")
-		if _, err := os.Stat(envConfig); err == nil {
-			return envConfig, nil
-		}
-	}
-
-	srcConfig := "src/platform/config"
-	if _, err := os.Stat(srcConfig); err == nil {
-		return srcConfig, nil
-	}
-
-	return "", fmt.Errorf("config directory not found")
-}
-
 // cfgValidate implements the config:validate command
 type cfgValidate struct {
 	log       *launchr.Logger
 	term      *launchr.Terminal
 	component string
-	platform  string
+	chassis   string
 	strict    bool
 }
 
@@ -272,7 +247,7 @@ type cfgRotate struct {
 	log        *launchr.Logger
 	term       *launchr.Terminal
 	key        string
-	platform   string
+	chassis    string
 	yesIAmSure bool
 }
 

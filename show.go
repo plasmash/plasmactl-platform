@@ -31,8 +31,8 @@ func (a *platformShow) SetTerm(term *launchr.Terminal) {
 
 // Execute runs the platform:show action
 func (a *platformShow) Execute() error {
-	envDir := filepath.Join("inst", a.name)
-	platformFile := filepath.Join(envDir, "platform.yaml")
+	instDir := filepath.Join("inst", a.name)
+	platformFile := filepath.Join(instDir, "platform.yaml")
 
 	// Check if platform exists
 	if _, err := os.Stat(platformFile); os.IsNotExist(err) {
@@ -51,7 +51,7 @@ func (a *platformShow) Execute() error {
 	}
 
 	// Count and list nodes
-	nodesDir := filepath.Join(envDir, "nodes")
+	nodesDir := filepath.Join(instDir, "nodes")
 	var nodes []string
 	if nodeEntries, err := os.ReadDir(nodesDir); err == nil {
 		for _, nodeEntry := range nodeEntries {

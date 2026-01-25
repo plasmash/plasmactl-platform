@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
@@ -63,12 +62,6 @@ func (sa *upAction) run(ctx context.Context, environment, tags string, options u
 		sa.Term().Info().Println("--ci option is deprecated: builds are now done by default in CI")
 	}
 
-	// Validate required actions exist in the platform package
-	// platform:deploy is mandatory - must be provided by the platform package (e.g., plasma-core)
-	if _, ok := sa.m.Get("platform:deploy"); !ok {
-		return errors.New("platform:deploy action not found - must be provided by your platform package (e.g., plasma-core)")
-	}
-
 	// Deploy from Platform Image - skip compose/sync/bump/prepare
 	if options.img != "" {
 		sa.Term().Info().Printfln("Deploying from Platform Image: %s", options.img)
@@ -84,12 +77,6 @@ func (sa *upAction) run(ctx context.Context, environment, tags string, options u
 			return fmt.Errorf("deploy error: %w", err)
 		}
 		return nil
-	}
-
-	// platform:prepare is optional - auto-skip if not found
-	if _, hasPrepare := sa.m.Get("platform:prepare"); !hasPrepare && !options.skipPrepare {
-		sa.Term().Info().Println("platform:prepare action not found - skipping prepare phase")
-		options.skipPrepare = true
 	}
 
 	sa.Log().Info("arguments", "environment", environment, "tags", tags)
@@ -125,7 +112,7 @@ func (sa *upAction) run(ctx context.Context, environment, tags string, options u
 		sa.Term().Info().Println("Starting local build")
 
 		// Commands executed sequentially: compose → prepare → sync → deploy
-		err = sa.executeAction(ctx, "package:compose", nil, action.InputParams{
+		err = sa.executeAction(ctx, "model:compose", nil, action.InputParams{
 			"skip-not-versioned":  true,
 			"conflicts-verbosity": options.conflictsVerbosity,
 			"clean":               options.clean,
@@ -136,7 +123,7 @@ func (sa *upAction) run(ctx context.Context, environment, tags string, options u
 
 		sa.Term().Println()
 		if !options.skipPrepare {
-			err = sa.executeAction(ctx, "platform:prepare", nil, action.InputParams{
+			err = sa.executeAction(ctx, "model:prepare", nil, action.InputParams{
 				"clean": options.cleanPrepare,
 			}, options.persistent, options.streams)
 			if err != nil {
@@ -319,20 +306,4 @@ func (sa *upAction) getCredentials(url, username, password string) (keyring.Cred
 	}
 
 	return ci, save, nil
-}
-
-func isURLAccessible(url string, code *int) bool {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return false
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false
-	}
-
-	defer resp.Body.Close()
-	*code = resp.StatusCode
-	return resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices
 }

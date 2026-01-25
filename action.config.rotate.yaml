@@ -8,12 +8,12 @@ action:
       description: Secret key to rotate (e.g., auth_kratos_db_password). If empty, rotates all.
       required: false
   options:
-    - name: platform
-      shorthand: p
-      title: Platform
-      description: Platform name (defaults to current environment)
+    - name: chassis
+      shorthand: c
+      title: Chassis
+      description: Chassis name (e.g., platform.foundation.cluster)
       type: string
-      default: ""
+      required: true
     - name: yes-i-am-sure
       title: Yes I Am Sure
       description: Skip confirmation prompt (for automation)

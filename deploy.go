@@ -65,6 +65,9 @@ func (a *platformDeploy) Execute() error {
 	if a.extractedDir != "" {
 		workDir = a.extractedDir
 	}
+	if workDir == "" {
+		return fmt.Errorf("no working directory specified (use --prepare-dir or --img)")
+	}
 
 	// Change to working directory
 	if err := os.Chdir(workDir); err != nil {
