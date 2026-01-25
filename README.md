@@ -4,32 +4,34 @@ A [Launchr](https://github.com/launchrctl/launchr) plugin for [Plasmactl](https:
 
 ## Overview
 
-`plasmactl-platform` orchestrates the complete platform deployment workflow including composition, version bumping, packaging, releasing, and deployment. It integrates with CI/CD systems and provides both local and remote deployment capabilities.
+`plasmactl-platform` orchestrates the complete platform deployment workflow including creation, validation, deployment, and destruction. It integrates with CI/CD systems and provides both local and remote deployment capabilities.
 
 ## Features
 
-- **Multi-Step Orchestration**: Executes compose, bump, package, and deploy in sequence
+- **Platform Lifecycle**: Create, list, show, validate, deploy, destroy platforms
+- **Multi-Step Orchestration**: Executes bump, compose, prepare, and deploy in sequence
 - **CI/CD Integration**: Triggers pipelines in GitLab, GitHub Actions, and other systems
-- **Artifact Management**: Create deployment packages (.pi Plasma Images)
-- **Release Management**: Create git tags with changelogs and upload artifacts to forge releases (GitHub, GitLab, Gitea, Forgejo)
+- **DNS Configuration**: Automatic DNS setup (MX, DKIM, DMARC, SPF, rDNS)
+- **Configuration Management**: Get, set, list, validate, rotate config values
 - **Environment-Aware**: Deploy to dev, staging, production environments
-- **Chassis-Based Deployment**: Target specific platform sections
 
 ## Commands
 
-### platform:ship
+### Platform Commands
 
-Orchestrate deployment to an environment:
+#### platform:up
+
+Full deployment workflow (bump → compose → prepare → deploy):
 
 ```bash
 # Deploy a chassis section
-plasmactl platform:ship dev platform.interaction.observability
+plasmactl platform:up dev platform.interaction.observability
 
 # Deploy a specific application
-plasmactl platform:ship dev interaction.applications.dashboards
+plasmactl platform:up dev interaction.applications.dashboards
 
 # Local deployment (skip CI/CD)
-plasmactl platform:ship --local dev platform.interaction.observability
+plasmactl platform:up --local dev platform.interaction.observability
 ```
 
 Options:
@@ -37,179 +39,191 @@ Options:
 - `--skip-prepare`: Skip prepare phase
 - `--local`: Run deployment locally instead of via CI/CD
 - `--clean`: Clean compose working directory
+- `--clean-prepare`: Clean prepare directory
 - `--debug`: Enable Ansible debug mode
+- `--img`: Deploy from a Platform Image (.pi) file
 
-### platform:image
+Aliases: `ship`
 
-Create a Platform Image (.pi) for distribution and deployment:
+#### platform:create
 
-```bash
-plasmactl platform:image
-```
-
-Creates image in `img/` directory as `{name}-{version}.pi` where version is the tag name (if on a tag) or commit SHA.
-
-### platform:release
-
-Create a git tag with changelog and optionally upload artifact to forge release:
+Create a new platform scaffold with DNS configuration:
 
 ```bash
-# Preview changelog only
-plasmactl platform:release --preview
-
-# Create tag only (no forge release)
-plasmactl platform:release --skip-upload
-
-# Create tag and upload artifact to forge release
-plasmactl platform:release --token <your-pat>
+plasmactl platform:create ski-dev \
+  --metal-provider scaleway \
+  --dns-provider ovh \
+  --domain dev.skilld.cloud
 ```
 
 Options:
-- `--tag`: Custom version tag (default: auto-increment)
-- `--preview`: Preview changelog without creating tag
-- `--skip-upload`: Create tag only, skip forge release creation
-- `--token`: API token for forge (GitHub/GitLab/Gitea/Forgejo PAT)
+- `--metal-provider`: Infrastructure provider (scaleway, hetzner, ovh, aws, gcp, azure)
+- `--dns-provider`: DNS provider (ovh, cloudflare, route53)
+- `--domain`: Domain name for the platform
+- `--skip-dns`: Skip DNS configuration
 
-Supported forges (auto-detected):
-- **GitHub** (github.com and GitHub Enterprise)
-- **GitLab** (gitlab.com and self-hosted)
-- **Gitea** (gitea.com and self-hosted)
-- **Forgejo** (codeberg.org and self-hosted)
+#### platform:list
 
-## Platform-Specific Actions
+List all platforms:
 
-The following actions must be provided by your platform package (e.g., [plasma-core](https://github.com/plasmash/pla-plasma)):
+```bash
+plasmactl platform:list
+plasmactl platform:list --format json
+```
 
-### platform:prepare
+#### platform:show
 
-Prepare runtime environment with Ansible requirements. Provided by the platform package at `src/platform/actions/prepare/`.
+Show platform details:
 
-### platform:deploy
+```bash
+plasmactl platform:show ski-dev
+plasmactl platform:show ski-dev --format json
+```
 
-Deploy Ansible resources to target cluster. Provided by the platform package at `src/platform/actions/deploy/`.
+#### platform:validate
 
-**Note**: `platform:ship` validates these actions exist at runtime:
-- `platform:deploy` is **mandatory** - deployment fails if not found
-- `platform:prepare` is **optional** - automatically skipped if not found
+Validate platform configuration:
+
+```bash
+plasmactl platform:validate ski-dev
+plasmactl platform:validate ski-dev --skip-dns --skip-mail
+```
+
+#### platform:deploy
+
+Deploy to a platform (Ansible deployment):
+
+```bash
+plasmactl platform:deploy dev platform.interaction.observability
+plasmactl platform:deploy dev interaction.applications.connect --debug
+```
+
+Options:
+- `--debug`: Enable Ansible debug mode
+- `--check`: Dry-run mode (no changes)
+- `--img`: Deploy from Platform Image
+- `--prepare-dir`: Custom prepare directory
+
+#### platform:destroy
+
+Destroy a platform (requires confirmation):
+
+```bash
+plasmactl platform:destroy ski-dev
+
+# With confirmation bypass (for automation)
+plasmactl platform:destroy ski-dev --yes-i-am-sure
+```
+
+### Config Commands
+
+#### config:get
+
+Get a configuration value:
+
+```bash
+plasmactl config:get platform.deploy.gitlab_domain
+plasmactl config:get auth_kratos_db_password --vault
+```
+
+#### config:set
+
+Set a configuration value:
+
+```bash
+plasmactl config:set platform.deploy.gitlab_domain=gitlab.example.com
+plasmactl config:set auth_kratos_db_password=secret --vault
+```
+
+#### config:list
+
+List configuration values:
+
+```bash
+plasmactl config:list
+plasmactl config:list auth_kratos
+plasmactl config:list --vault
+```
+
+#### config:validate
+
+Validate configuration against schemas:
+
+```bash
+plasmactl config:validate
+plasmactl config:validate auth_kratos --strict
+```
+
+#### config:rotate
+
+Rotate secrets:
+
+```bash
+plasmactl config:rotate
+plasmactl config:rotate auth_kratos_db_password
+```
 
 ## Deployment Workflow
 
 ### Full Workflow
 
 ```bash
-plasmactl platform:ship dev platform.interaction.observability
+plasmactl platform:up dev platform.interaction.observability
 ```
 
 Executes:
-1. **Compose**: `plasmactl package:compose`
-2. **Bump**: `plasmactl component:bump`
+1. **Bump**: `plasmactl component:bump`
+2. **Compose**: `plasmactl package:compose`
 3. **Prepare**: `plasmactl platform:prepare` (if available)
-4. **Sync**: `plasmactl component:sync`
-5. **Deploy**: `plasmactl platform:deploy`
+4. **Deploy**: `plasmactl platform:deploy`
 
-### Chassis-Based Deployment
-
-Deploy via chassis attachment point:
+### End-to-End Platform Setup
 
 ```bash
-# From platform repository
-plasmactl platform:ship dev platform.interaction.interop
+# 1. Create platform with DNS
+plasmactl platform:create ski-dev \
+  --metal-provider scaleway \
+  --dns-provider ovh \
+  --domain dev.skilld.cloud
+
+# 2. Provision nodes (via plasmactl-node)
+plasmactl node:provision ski-dev -c foundation.cluster.control:GP1-L:3
+
+# 3. Deploy
+plasmactl platform:deploy ski-dev
 ```
 
-**Important**: Chassis deployment applies variable overrides from `group_vars` based on the chassis attachment point.
+## Directory Structure
 
-### Direct Application Deployment
+Platforms are stored in `inst/`:
 
-Deploy a specific application:
-
-```bash
-plasmactl platform:ship dev interaction.applications.connect
 ```
-
-**Note**: Direct deployment bypasses chassis-specific variable overrides.
-
-## Environments
-
-### Standard Environments
-
-- **dev**: Development environment for testing
-- **staging**: Pre-production environment
-- **prod**: Production environment
-
-### Environment Configuration
-
-Each environment has:
-- Target Kubernetes cluster
-- Node assignments
-- Resource allocations
-- Security policies
-- Environment-specific variables
+inst/
+└── ski-dev/
+    ├── platform.yaml      # Platform configuration
+    └── nodes/             # Node definitions
+        └── *.yaml
+```
 
 ## CI/CD Integration
 
-### GitLab CI (Current)
-
-The plugin integrates with GitLab CI using Ory authentication:
+### GitLab CI
 
 ```bash
 # Store credentials
-plasmactl keyring:set ory_client_id
-plasmactl keyring:set ory_client_secret
+plasmactl keyring:login gitlab
 ```
 
-### GitHub Actions (Planned)
-
-Future GitHub Actions integration with GitHub CLI authentication.
-
-## Local Deployment
-
-Run deployment locally without CI/CD:
+### GitHub Actions
 
 ```bash
-plasmactl platform:ship --local dev platform.interaction.observability
+plasmactl keyring:login github
 ```
-
-Useful for:
-- Development and testing
-- Debugging deployment issues
-- Quick iterations
-
-## Workflow Examples
-
-### Complete Release and Deploy
-
-```bash
-# 1. Create release tag
-plasmactl platform:release
-
-# 2. Ship to dev
-plasmactl platform:ship dev platform.interaction.observability
-
-# 3. After testing, ship to prod
-plasmactl platform:ship prod platform.interaction.observability
-```
-
-### Iterative Development
-
-```bash
-# Make changes, commit
-git commit -m "feat: add new component"
-
-# Quick deploy to dev
-plasmactl platform:ship dev platform.interaction.observability --skip-bump
-```
-
-## Best Practices
-
-1. **Use Chassis Deployment**: Prefer chassis-based deployment for proper variable resolution
-2. **Test in Dev First**: Always deploy to dev before staging/production
-3. **Monitor Pipelines**: Watch CI/CD pipeline execution for errors
-4. **Incremental Updates**: Deploy small, tested changes frequently
-5. **Version Control**: Ensure all changes are committed before shipping
 
 ## Documentation
 
 - [Plasmactl](https://github.com/plasmash/plasmactl) - Main CLI tool
+- [plasmactl-node](https://github.com/plasmash/plasmactl-node) - Node provisioning
 - [Plasma Platform](https://plasma.sh) - Platform documentation
 
 ## License
