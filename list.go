@@ -31,7 +31,7 @@ func (a *platformList) SetTerm(term *launchr.Terminal) {
 
 // Execute runs the platform:list action
 func (a *platformList) Execute() error {
-	envDir := "env"
+	envDir := "inst"
 
 	// Check if env directory exists
 	if _, err := os.Stat(envDir); os.IsNotExist(err) {

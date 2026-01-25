@@ -62,7 +62,7 @@ func (a *cfgGet) Execute() error {
 func (a *cfgGet) resolveConfigDir() (string, error) {
 	// If platform specified, use inst/{platform}/config or src/{layer}/config
 	if a.platform != "" {
-		envConfig := filepath.Join("env", a.platform, "config")
+		envConfig := filepath.Join("inst", a.platform, "config")
 		if _, err := os.Stat(envConfig); err == nil {
 			return envConfig, nil
 		}
@@ -95,7 +95,7 @@ func (a *cfgSet) Execute() error {
 	if err != nil {
 		// Create config directory if it doesn't exist
 		if a.platform != "" {
-			configDir = filepath.Join("env", a.platform, "config")
+			configDir = filepath.Join("inst", a.platform, "config")
 		} else {
 			configDir = "src/platform/config"
 		}
@@ -137,7 +137,7 @@ func (a *cfgSet) Execute() error {
 
 func (a *cfgSet) resolveConfigDir() (string, error) {
 	if a.platform != "" {
-		envConfig := filepath.Join("env", a.platform, "config")
+		envConfig := filepath.Join("inst", a.platform, "config")
 		if _, err := os.Stat(envConfig); err == nil {
 			return envConfig, nil
 		}
@@ -228,7 +228,7 @@ func (a *cfgList) Execute() error {
 
 func (a *cfgList) resolveConfigDir() (string, error) {
 	if a.platform != "" {
-		envConfig := filepath.Join("env", a.platform, "config")
+		envConfig := filepath.Join("inst", a.platform, "config")
 		if _, err := os.Stat(envConfig); err == nil {
 			return envConfig, nil
 		}

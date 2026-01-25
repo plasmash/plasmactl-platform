@@ -32,7 +32,7 @@ func (a *destroyPlatformAction) SetTerm(term *launchr.Terminal) {
 
 // Execute runs the platform:destroy action
 func (a *destroyPlatformAction) Execute() error {
-	envDir := filepath.Join("env", a.name)
+	envDir := filepath.Join("inst", a.name)
 
 	// Check if platform exists
 	if _, err := os.Stat(envDir); os.IsNotExist(err) {

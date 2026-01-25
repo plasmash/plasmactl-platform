@@ -33,7 +33,7 @@ func (a *platformValidate) SetTerm(term *launchr.Terminal) {
 
 // Execute runs the platform:validate action
 func (a *platformValidate) Execute() error {
-	envDir := filepath.Join("env", a.name)
+	envDir := filepath.Join("inst", a.name)
 	platformFile := filepath.Join(envDir, "platform.yaml")
 
 	// Check if platform exists

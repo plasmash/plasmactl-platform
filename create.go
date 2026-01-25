@@ -38,7 +38,7 @@ func (a *platformCreate) SetTerm(term *launchr.Terminal) {
 
 // Execute runs the platform:create action
 func (a *platformCreate) Execute() error {
-	envDir := filepath.Join("env", a.name)
+	envDir := filepath.Join("inst", a.name)
 	nodesDir := filepath.Join(envDir, "nodes")
 	platformFile := filepath.Join(envDir, "platform.yaml")
 
