@@ -1,0 +1,16 @@
+runtime: plugin
+action:
+  title: Show Platform
+  description: "Show details of a platform including DNS status"
+  arguments:
+    - name: name
+      title: Name
+      description: The name of the platform to show
+      required: true
+  options:
+    - name: format
+      shorthand: o
+      title: Output Format
+      description: Output format (table, json, yaml)
+      type: string
+      default: "table"

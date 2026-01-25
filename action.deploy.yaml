@@ -1,0 +1,47 @@
+runtime: plugin
+action:
+  title: Deploy Platform
+  description: Deploy Ansible resources to target cluster
+  arguments:
+    - name: environment
+      title: Environment
+      description: The environment to deploy to
+      required: true
+    - name: tags
+      title: Tags
+      description: The Ansible resources to deploy (comma-separated)
+      required: true
+  options:
+    - name: img
+      title: Platform Image
+      description: Deploy from a Platform Image (.pm) file
+      type: string
+      default: ""
+    - name: debug
+      title: Debug
+      description: Run ansible-playbook in verbose mode (-vvv)
+      type: bool
+      default: false
+    - name: check
+      title: Check
+      description: Run ansible-playbook in check mode (dry-run)
+      type: bool
+      default: false
+    - name: password
+      title: Vault Password
+      description: Ansible vault password
+      process:
+        - processor: keyring.GetKeyValue
+          options:
+            key: vaultpass
+      default: ""
+    - name: logs
+      title: Logs
+      description: Store output in deploy.log file
+      type: bool
+      default: false
+    - name: prepare-dir
+      title: Prepare Directory
+      description: Directory containing prepared model
+      type: string
+      default: ".plasma/prepare"

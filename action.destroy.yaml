@@ -1,0 +1,20 @@
+runtime: plugin
+action:
+  title: Destroy Platform
+  description: "Destroy a platform and all its resources (requires confirmation)"
+  arguments:
+    - name: name
+      title: Name
+      description: The name of the platform to destroy
+      required: true
+  options:
+    - name: yes-i-am-sure
+      title: Yes I Am Sure
+      description: Skip confirmation prompt (for automation)
+      type: bool
+      default: false
+    - name: keep-dns
+      title: Keep DNS
+      description: Keep DNS records (don't delete MX, DKIM, DMARC, SPF)
+      type: bool
+      default: false

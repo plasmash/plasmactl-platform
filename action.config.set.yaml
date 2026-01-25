@@ -1,0 +1,25 @@
+runtime: plugin
+action:
+  title: Set Config
+  description: "Set a configuration value"
+  arguments:
+    - name: key
+      title: Key
+      description: The configuration key to set (e.g., auth_kratos_db_host)
+      required: true
+    - name: value
+      title: Value
+      description: The value to set
+      required: true
+  options:
+    - name: vault
+      title: Vault
+      description: Store in encrypted vault (secrets)
+      type: bool
+      default: false
+    - name: platform
+      shorthand: p
+      title: Platform
+      description: Platform name (defaults to current environment)
+      type: string
+      default: ""

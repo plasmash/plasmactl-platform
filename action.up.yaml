@@ -1,9 +1,9 @@
 runtime: plugin
 action:
-  title: Ship
-  description: "Deploy to environment: bump → compose → prepare → sync → deploy (local), or trigger CI pipeline"
+  title: Up
+  description: "Full workflow: bump → compose → prepare → deploy (local), or trigger CI pipeline"
   alias:
-    - deliver
+    - ship
   arguments:
     - name: environment
       title: Environment

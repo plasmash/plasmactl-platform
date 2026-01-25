@@ -1,0 +1,21 @@
+runtime: plugin
+action:
+  title: Validate Config
+  description: "Validate configuration against component schemas"
+  arguments:
+    - name: component
+      title: Component
+      description: Component name to validate (e.g., auth_kratos). If empty, validates all.
+      required: false
+  options:
+    - name: platform
+      shorthand: p
+      title: Platform
+      description: Platform name (defaults to current environment)
+      type: string
+      default: ""
+    - name: strict
+      title: Strict
+      description: Fail on warnings (not just errors)
+      type: bool
+      default: false

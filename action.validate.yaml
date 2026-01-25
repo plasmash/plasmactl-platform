@@ -1,0 +1,20 @@
+runtime: plugin
+action:
+  title: Validate Platform
+  description: "Validate platform configuration including DNS propagation and mail authentication"
+  arguments:
+    - name: name
+      title: Name
+      description: The name of the platform to validate
+      required: true
+  options:
+    - name: skip-dns
+      title: Skip DNS
+      description: Skip DNS validation
+      type: bool
+      default: false
+    - name: skip-mail
+      title: Skip Mail
+      description: Skip mail authentication validation (DKIM, DMARC, SPF)
+      type: bool
+      default: false
