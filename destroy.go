@@ -32,10 +32,10 @@ func (a *destroyPlatformAction) SetTerm(term *launchr.Terminal) {
 
 // Execute runs the platform:destroy action
 func (a *destroyPlatformAction) Execute() error {
-	envDir := filepath.Join("inst", a.name)
+	instDir := filepath.Join("inst", a.name)
 
 	// Check if platform exists
-	if _, err := os.Stat(envDir); os.IsNotExist(err) {
+	if _, err := os.Stat(instDir); os.IsNotExist(err) {
 		return fmt.Errorf("platform %q not found", a.name)
 	}
 
@@ -61,7 +61,7 @@ func (a *destroyPlatformAction) Execute() error {
 
 	// TODO: Destroy nodes via Terraform
 	// This should invoke node:destroy for each node
-	nodesDir := filepath.Join(envDir, "nodes")
+	nodesDir := filepath.Join(instDir, "nodes")
 	if nodeEntries, err := os.ReadDir(nodesDir); err == nil {
 		for _, nodeEntry := range nodeEntries {
 			if !nodeEntry.IsDir() && filepath.Ext(nodeEntry.Name()) == ".yaml" && nodeEntry.Name() != ".gitkeep" {
@@ -74,7 +74,7 @@ func (a *destroyPlatformAction) Execute() error {
 
 	// Remove the environment directory
 	a.term.Info().Println("  Removing platform directory...")
-	if err := os.RemoveAll(envDir); err != nil {
+	if err := os.RemoveAll(instDir); err != nil {
 		return fmt.Errorf("failed to remove platform directory: %w", err)
 	}
 

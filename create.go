@@ -38,13 +38,13 @@ func (a *platformCreate) SetTerm(term *launchr.Terminal) {
 
 // Execute runs the platform:create action
 func (a *platformCreate) Execute() error {
-	envDir := filepath.Join("inst", a.name)
-	nodesDir := filepath.Join(envDir, "nodes")
-	platformFile := filepath.Join(envDir, "platform.yaml")
+	instDir := filepath.Join("inst", a.name)
+	nodesDir := filepath.Join(instDir, "nodes")
+	platformFile := filepath.Join(instDir, "platform.yaml")
 
 	// Check if platform already exists
-	if _, err := os.Stat(envDir); !os.IsNotExist(err) {
-		return fmt.Errorf("platform %q already exists at %s", a.name, envDir)
+	if _, err := os.Stat(instDir); !os.IsNotExist(err) {
+		return fmt.Errorf("platform %q already exists at %s", a.name, instDir)
 	}
 
 	a.term.Info().Printfln("Creating platform %q", a.name)
@@ -96,7 +96,7 @@ func (a *platformCreate) Execute() error {
 		return fmt.Errorf("failed to write .gitkeep: %w", err)
 	}
 
-	a.term.Success().Printfln("Created platform scaffold at %s", envDir)
+	a.term.Success().Printfln("Created platform scaffold at %s", instDir)
 
 	// Configure DNS if not skipped and not manual
 	if !a.skipDNS && a.dnsProvider != "manual" {

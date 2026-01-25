@@ -192,9 +192,9 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		get := &cfgGet{
-			key:      input.Arg("key").(string),
-			vault:    input.Opt("vault").(bool),
-			platform: input.Opt("platform").(string),
+			key:     input.Arg("key").(string),
+			vault:   input.Opt("vault").(bool),
+			chassis: input.Opt("chassis").(string),
 		}
 		get.SetLogger(log)
 		get.SetTerm(term)
@@ -208,10 +208,10 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		set := &cfgSet{
-			key:      input.Arg("key").(string),
-			value:    input.Arg("value").(string),
-			vault:    input.Opt("vault").(bool),
-			platform: input.Opt("platform").(string),
+			key:     input.Arg("key").(string),
+			value:   input.Arg("value").(string),
+			vault:   input.Opt("vault").(bool),
+			chassis: input.Opt("chassis").(string),
 		}
 		set.SetLogger(log)
 		set.SetTerm(term)
@@ -232,7 +232,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		list := &cfgList{
 			component: component,
 			vault:     input.Opt("vault").(bool),
-			platform:  input.Opt("platform").(string),
+			chassis:   input.Opt("chassis").(string),
 			format:    input.Opt("format").(string),
 		}
 		list.SetLogger(log)
@@ -253,7 +253,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		validate := &cfgValidate{
 			component: component,
-			platform:  input.Opt("platform").(string),
+			chassis:   input.Opt("chassis").(string),
 			strict:    input.Opt("strict").(bool),
 		}
 		validate.SetLogger(log)
@@ -274,7 +274,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		rotate := &cfgRotate{
 			key:        key,
-			platform:   input.Opt("platform").(string),
+			chassis:    input.Opt("chassis").(string),
 			yesIAmSure: input.Opt("yes-i-am-sure").(bool),
 		}
 		rotate.SetLogger(log)

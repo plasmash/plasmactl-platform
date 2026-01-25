@@ -31,16 +31,16 @@ func (a *platformList) SetTerm(term *launchr.Terminal) {
 
 // Execute runs the platform:list action
 func (a *platformList) Execute() error {
-	envDir := "inst"
+	instDir := "inst"
 
 	// Check if env directory exists
-	if _, err := os.Stat(envDir); os.IsNotExist(err) {
+	if _, err := os.Stat(instDir); os.IsNotExist(err) {
 		a.term.Info().Println("No platforms found (inst/ directory does not exist)")
 		return nil
 	}
 
 	// List all directories in inst/
-	entries, err := os.ReadDir(envDir)
+	entries, err := os.ReadDir(instDir)
 	if err != nil {
 		return fmt.Errorf("failed to read env directory: %w", err)
 	}
@@ -52,7 +52,7 @@ func (a *platformList) Execute() error {
 			continue
 		}
 
-		platformFile := filepath.Join(envDir, entry.Name(), "platform.yaml")
+		platformFile := filepath.Join(instDir, entry.Name(), "platform.yaml")
 		if _, err := os.Stat(platformFile); os.IsNotExist(err) {
 			continue // Not a valid platform directory
 		}
@@ -71,7 +71,7 @@ func (a *platformList) Execute() error {
 		}
 
 		// Count nodes
-		nodesDir := filepath.Join(envDir, entry.Name(), "nodes")
+		nodesDir := filepath.Join(instDir, entry.Name(), "nodes")
 		nodeCount := 0
 		if nodeEntries, err := os.ReadDir(nodesDir); err == nil {
 			for _, nodeEntry := range nodeEntries {
