@@ -275,14 +275,17 @@ func (a *platformDeploy) buildEnvironment() []string {
 	return env
 }
 
-// createAskpassScript creates a script for SSH_ASKPASS
+// createAskpassScript creates a script for SSH_ASKPASS that reads password from env var
+// This avoids writing the actual password to disk - only a script that echoes an env var
 func (a *platformDeploy) createAskpassScript() (string, error) {
 	tmpFile, err := os.CreateTemp("", "askpass-*.sh")
 	if err != nil {
 		return "", fmt.Errorf("failed to create askpass script: %w", err)
 	}
 
-	script := fmt.Sprintf("#!/bin/sh\necho \"%s\"\n", a.password)
+	// Script reads password from environment variable, not from file
+	// The actual password is passed via PLASMA_VAULT_PASS env var at runtime
+	script := "#!/bin/sh\necho \"$PLASMA_VAULT_PASS\"\n"
 	if _, err := tmpFile.WriteString(script); err != nil {
 		tmpFile.Close()
 		os.Remove(tmpFile.Name())
@@ -305,6 +308,8 @@ func (a *platformDeploy) runAnsiblePlaybook(args, env []string, askpassScript st
 		fmt.Sprintf("SSH_ASKPASS=%s", askpassScript),
 		"SSH_ASKPASS_REQUIRE=force",
 		fmt.Sprintf("ANSIBLE_VAULT_PASSWORD_FILE=%s", askpassScript),
+		// Pass password via env var - the script echoes this, password never written to disk
+		fmt.Sprintf("PLASMA_VAULT_PASS=%s", a.password),
 	)
 
 	// Set up output
