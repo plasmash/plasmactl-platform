@@ -1,0 +1,32 @@
+runtime: plugin
+action:
+  title: Create Platform
+  description: "Create a new platform scaffold with platform.yaml, nodes/ directory, and configure DNS"
+  arguments:
+    - name: name
+      title: Name
+      description: The name of the platform to create
+      required: true
+  options:
+    - name: metal-provider
+      shorthand: m
+      title: Metal Provider
+      description: Infrastructure provider for bare metal/VMs (scaleway, hetzner, aws, ovh, gcp, azure, manual)
+      type: string
+      default: "manual"
+    - name: dns-provider
+      title: DNS Provider
+      description: DNS provider for domain configuration (ovh, cloudflare, route53, gcp, manual)
+      type: string
+      default: "manual"
+    - name: domain
+      shorthand: d
+      title: Domain
+      description: Domain name for the platform
+      type: string
+      required: true
+    - name: skip-dns
+      title: Skip DNS
+      description: Skip DNS configuration (MX, DKIM, DMARC, SPF)
+      type: bool
+      default: false
