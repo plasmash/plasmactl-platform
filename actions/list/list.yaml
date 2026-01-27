@@ -3,9 +3,9 @@ action:
   title: List Platforms
   description: "List all platforms in the current repository"
   options:
-    - name: format
+    - name: output
       shorthand: o
       title: Output Format
-      description: Output format (table, json, yaml)
+      description: Output format (json, yaml). Default is table.
       type: string
-      default: "table"
+      default: ""

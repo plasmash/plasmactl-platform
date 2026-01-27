@@ -1,4 +1,4 @@
-package plasmactlplatform
+package deploy
 
 import (
 	"archive/tar"
@@ -15,55 +15,55 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// platformDeploy implements the platform:deploy command
-type platformDeploy struct {
-	log     *launchr.Logger
-	term    *launchr.Terminal
-	keyring keyring.Keyring
+// Deploy implements the platform:deploy command
+type Deploy struct {
+	Log     *launchr.Logger
+	Term    *launchr.Terminal
+	Keyring keyring.Keyring
 
-	environment string
-	tags        string
-	img         string
-	debug       bool
-	check       bool
-	password    string
-	logs        bool
-	prepareDir  string
+	Environment string
+	Tags        string
+	Img         string
+	Debug       bool
+	Check       bool
+	Password    string
+	Logs        bool
+	PrepareDir  string
 
 	originalDir  string
 	extractedDir string
 }
 
 // SetLogger sets the logger for the action
-func (a *platformDeploy) SetLogger(log *launchr.Logger) {
-	a.log = log
+func (d *Deploy) SetLogger(log *launchr.Logger) {
+	d.Log = log
 }
 
 // SetTerm sets the terminal for the action
-func (a *platformDeploy) SetTerm(term *launchr.Terminal) {
-	a.term = term
+func (d *Deploy) SetTerm(term *launchr.Terminal) {
+	d.Term = term
 }
 
 // Execute runs the platform:deploy action
-func (a *platformDeploy) Execute() error {
+func (d *Deploy) Execute() error {
 	var err error
-	a.originalDir, err = os.Getwd()
+	d.originalDir, err = os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
 	// Extract Platform Image if provided
-	if a.img != "" {
-		if err := a.extractImage(); err != nil {
+	if d.Img != "" {
+		if err := d.extractImage(); err != nil {
 			return err
 		}
-		defer a.cleanup()
+		defer d.cleanup()
 	}
 
 	// Determine working directory
-	workDir := a.prepareDir
-	if a.extractedDir != "" {
-		workDir = a.extractedDir
+	workDir := d.PrepareDir
+	if d.extractedDir != "" {
+		workDir = d.extractedDir
 	}
 	if workDir == "" {
 		return fmt.Errorf("no working directory specified (use --prepare-dir or --img)")
@@ -73,38 +73,38 @@ func (a *platformDeploy) Execute() error {
 	if err := os.Chdir(workDir); err != nil {
 		return fmt.Errorf("failed to change to prepare directory %s: %w", workDir, err)
 	}
-	defer os.Chdir(a.originalDir)
+	defer os.Chdir(d.originalDir)
 
 	// Check if hosts cache exists
-	if !a.cacheExists() {
-		a.term.Warning().Println("Inventory cache does not exist, skipping deployment")
+	if !d.cacheExists() {
+		d.Term.Warning().Println("Inventory cache does not exist, skipping deployment")
 		return nil
 	}
 
-	a.term.Info().Printfln("Deploying %s to %s...", a.tags, a.environment)
+	d.Term.Info().Printfln("Deploying %s to %s...", d.Tags, d.Environment)
 
 	// Build ansible-playbook command
-	args := a.buildAnsibleArgs()
+	args := d.buildAnsibleArgs()
 
 	// Set up environment
-	env := a.buildEnvironment()
+	env := d.buildEnvironment()
 
 	// Create askpass script for vault password
-	askpassScript, err := a.createAskpassScript()
+	askpassScript, err := d.createAskpassScript()
 	if err != nil {
 		return err
 	}
 	defer os.Remove(askpassScript)
 
 	// Run ansible-playbook
-	return a.runAnsiblePlaybook(args, env, askpassScript)
+	return d.runAnsiblePlaybook(args, env, askpassScript)
 }
 
 // extractImage extracts a Platform Image (.pm) file
-func (a *platformDeploy) extractImage() error {
-	imgPath := a.img
+func (d *Deploy) extractImage() error {
+	imgPath := d.Img
 	if !filepath.IsAbs(imgPath) {
-		imgPath = filepath.Join(a.originalDir, imgPath)
+		imgPath = filepath.Join(d.originalDir, imgPath)
 	}
 
 	if _, err := os.Stat(imgPath); os.IsNotExist(err) {
@@ -112,15 +112,15 @@ func (a *platformDeploy) extractImage() error {
 	}
 
 	// Create extraction directory
-	a.extractedDir = ".deploy"
-	if err := os.RemoveAll(a.extractedDir); err != nil && !os.IsNotExist(err) {
+	d.extractedDir = ".deploy"
+	if err := os.RemoveAll(d.extractedDir); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to clean extraction directory: %w", err)
 	}
-	if err := os.MkdirAll(a.extractedDir, 0755); err != nil {
+	if err := os.MkdirAll(d.extractedDir, 0755); err != nil {
 		return fmt.Errorf("failed to create extraction directory: %w", err)
 	}
 
-	a.term.Info().Printfln("Extracting Platform Image: %s", imgPath)
+	d.Term.Info().Printfln("Extracting Platform Image: %s", imgPath)
 
 	// Open the tar.gz file
 	file, err := os.Open(imgPath)
@@ -146,7 +146,7 @@ func (a *platformDeploy) extractImage() error {
 			return fmt.Errorf("failed to read tar: %w", err)
 		}
 
-		target := filepath.Join(a.extractedDir, header.Name)
+		target := filepath.Join(d.extractedDir, header.Name)
 
 		switch header.Typeflag {
 		case tar.TypeDir:
@@ -173,26 +173,26 @@ func (a *platformDeploy) extractImage() error {
 		}
 	}
 
-	a.term.Info().Printfln("Platform Image extracted to %s/", a.extractedDir)
+	d.Term.Info().Printfln("Platform Image extracted to %s/", d.extractedDir)
 	return nil
 }
 
 // cleanup removes extracted files
-func (a *platformDeploy) cleanup() {
-	if a.extractedDir != "" {
-		os.Chdir(a.originalDir)
-		a.term.Info().Printfln("Cleaning up %s/", a.extractedDir)
-		os.RemoveAll(a.extractedDir)
+func (d *Deploy) cleanup() {
+	if d.extractedDir != "" {
+		os.Chdir(d.originalDir)
+		d.Term.Info().Printfln("Cleaning up %s/", d.extractedDir)
+		os.RemoveAll(d.extractedDir)
 	}
 }
 
 // cacheExists checks if the inventory cache file exists
-func (a *platformDeploy) cacheExists() bool {
-	configPath := fmt.Sprintf("library/inventories/platform_nodes/configuration/%s.yaml", a.environment)
+func (d *Deploy) cacheExists() bool {
+	configPath := fmt.Sprintf("library/inventories/platform_nodes/configuration/%s.yaml", d.Environment)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		a.log.Warn("Failed to read inventory configuration", "path", configPath, "error", err)
+		d.Log.Warn("Failed to read inventory configuration", "path", configPath, "error", err)
 		return false
 	}
 
@@ -203,7 +203,7 @@ func (a *platformDeploy) cacheExists() bool {
 	}
 
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		a.log.Warn("Failed to parse inventory configuration", "error", err)
+		d.Log.Warn("Failed to parse inventory configuration", "error", err)
 		return false
 	}
 
@@ -216,18 +216,18 @@ func (a *platformDeploy) cacheExists() bool {
 }
 
 // buildAnsibleArgs builds the ansible-playbook command arguments
-func (a *platformDeploy) buildAnsibleArgs() []string {
+func (d *Deploy) buildAnsibleArgs() []string {
 	args := []string{
 		"platform/platform.yaml",
-		"--tags", a.tags,
-		"--extra-vars", fmt.Sprintf("machine_target_config=%s", a.environment),
+		"--tags", d.Tags,
+		"--extra-vars", fmt.Sprintf("machine_target_config=%s", d.Environment),
 	}
 
-	if a.debug {
+	if d.Debug {
 		args = append(args, "-vvv")
 	}
 
-	if a.check {
+	if d.Check {
 		args = append(args, "--check")
 	}
 
@@ -235,7 +235,7 @@ func (a *platformDeploy) buildAnsibleArgs() []string {
 }
 
 // buildEnvironment builds the environment variables for ansible-playbook
-func (a *platformDeploy) buildEnvironment() []string {
+func (d *Deploy) buildEnvironment() []string {
 	env := os.Environ()
 
 	// Set ANSIBLE_CONFIG if not already set
@@ -264,7 +264,7 @@ func (a *platformDeploy) buildEnvironment() []string {
 				}
 			}
 		}
-		attrsMap["env"] = a.environment
+		attrsMap["env"] = d.Environment
 
 		var newAttrs []string
 		for k, v := range attrsMap {
@@ -280,7 +280,7 @@ func (a *platformDeploy) buildEnvironment() []string {
 
 // createAskpassScript creates a script for SSH_ASKPASS that reads password from env var
 // This avoids writing the actual password to disk - only a script that echoes an env var
-func (a *platformDeploy) createAskpassScript() (string, error) {
+func (d *Deploy) createAskpassScript() (string, error) {
 	tmpFile, err := os.CreateTemp("", "askpass-*.sh")
 	if err != nil {
 		return "", fmt.Errorf("failed to create askpass script: %w", err)
@@ -305,18 +305,18 @@ func (a *platformDeploy) createAskpassScript() (string, error) {
 }
 
 // runAnsiblePlaybook executes ansible-playbook
-func (a *platformDeploy) runAnsiblePlaybook(args, env []string, askpassScript string) error {
+func (d *Deploy) runAnsiblePlaybook(args, env []string, askpassScript string) error {
 	cmd := exec.Command("ansible-playbook", args...)
 	cmd.Env = append(env,
 		fmt.Sprintf("SSH_ASKPASS=%s", askpassScript),
 		"SSH_ASKPASS_REQUIRE=force",
 		fmt.Sprintf("ANSIBLE_VAULT_PASSWORD_FILE=%s", askpassScript),
 		// Pass password via env var - the script echoes this, password never written to disk
-		fmt.Sprintf("PLASMA_VAULT_PASS=%s", a.password),
+		fmt.Sprintf("PLASMA_VAULT_PASS=%s", d.Password),
 	)
 
 	// Set up output
-	if a.logs {
+	if d.Logs {
 		logFile, err := os.Create("deploy.log")
 		if err != nil {
 			return fmt.Errorf("failed to create log file: %w", err)
@@ -333,7 +333,7 @@ func (a *platformDeploy) runAnsiblePlaybook(args, env []string, askpassScript st
 
 	cmd.Stdin = os.Stdin
 
-	a.term.Info().Printfln("Running: ansible-playbook %s", strings.Join(args, " "))
+	d.Term.Info().Printfln("Running: ansible-playbook %s", strings.Join(args, " "))
 
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -342,6 +342,6 @@ func (a *platformDeploy) runAnsiblePlaybook(args, env []string, askpassScript st
 		return fmt.Errorf("failed to run ansible-playbook: %w", err)
 	}
 
-	a.term.Success().Println("Deployment completed successfully")
+	d.Term.Success().Println("Deployment completed successfully")
 	return nil
 }

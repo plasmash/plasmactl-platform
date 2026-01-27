@@ -1,51 +1,44 @@
-package plasmactlplatform
+package list
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/launchrctl/launchr"
-	"github.com/plasmash/plasmactl-platform/pkg/types"
+	"github.com/plasmash/plasmactl-platform/pkg/schema"
 	"gopkg.in/yaml.v3"
 )
 
-// platformList implements the platform:list command
-type platformList struct {
-	log    *launchr.Logger
-	term   *launchr.Terminal
-	format string
+// List implements the platform:list command
+type List struct {
+	Log    *launchr.Logger
+	Term   *launchr.Terminal
+	Format string
 }
 
-// SetLogger sets the logger for the action
-func (a *platformList) SetLogger(log *launchr.Logger) {
-	a.log = log
-}
+func (l *List) SetLogger(log *launchr.Logger) { l.Log = log }
+func (l *List) SetTerm(term *launchr.Terminal) { l.Term = term }
 
-// SetTerm sets the terminal for the action
-func (a *platformList) SetTerm(term *launchr.Terminal) {
-	a.term = term
-}
-
-// Execute runs the platform:list action
-func (a *platformList) Execute() error {
+func (l *List) Execute() error {
 	instDir := "inst"
 
-	// Check if env directory exists
+	// Check if inst directory exists
 	if _, err := os.Stat(instDir); os.IsNotExist(err) {
-		a.term.Info().Println("No platforms found (inst/ directory does not exist)")
+		l.Term.Info().Println("No platforms found (inst/ directory does not exist)")
 		return nil
 	}
 
 	// List all directories in inst/
 	entries, err := os.ReadDir(instDir)
 	if err != nil {
-		return fmt.Errorf("failed to read env directory: %w", err)
+		return fmt.Errorf("failed to read inst directory: %w", err)
 	}
 
-	var platforms []types.PlatformInfo
+	var platforms []schema.PlatformInfo
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -60,13 +53,13 @@ func (a *platformList) Execute() error {
 		// Read platform.yaml
 		data, err := os.ReadFile(platformFile)
 		if err != nil {
-			a.log.Warn("Failed to read %s: %v", platformFile, err)
+			l.Log.Warn("Failed to read %s: %v", platformFile, err)
 			continue
 		}
 
-		var platform types.Platform
+		var platform schema.Platform
 		if err := yaml.Unmarshal(data, &platform); err != nil {
-			a.log.Warn("Failed to parse %s: %v", platformFile, err)
+			l.Log.Warn("Failed to parse %s: %v", platformFile, err)
 			continue
 		}
 
@@ -81,7 +74,7 @@ func (a *platformList) Execute() error {
 			}
 		}
 
-		platforms = append(platforms, types.PlatformInfo{
+		platforms = append(platforms, schema.PlatformInfo{
 			Name:          platform.Name,
 			Domain:        platform.DNS.Domain,
 			MetalProvider: platform.Infrastructure.MetalProvider,
@@ -91,12 +84,12 @@ func (a *platformList) Execute() error {
 	}
 
 	if len(platforms) == 0 {
-		a.term.Info().Println("No platforms found")
+		l.Term.Info().Println("No platforms found")
 		return nil
 	}
 
 	// Output based on format
-	switch a.format {
+	switch strings.ToLower(l.Format) {
 	case "json":
 		output, err := json.MarshalIndent(platforms, "", "  ")
 		if err != nil {
@@ -112,11 +105,10 @@ func (a *platformList) Execute() error {
 		fmt.Println(string(output))
 
 	default: // table
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tDOMAIN\tMETAL\tDNS\tNODES")
-		fmt.Fprintln(w, "----\t------\t-----\t---\t-----")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+		fmt.Fprintln(w, "NAME\tDOMAIN\tPROVIDER\tNODES")
 		for _, p := range platforms {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n", p.Name, p.Domain, p.MetalProvider, p.DNSProvider, p.NodeCount)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", p.Name, p.Domain, p.MetalProvider, p.NodeCount)
 		}
 		w.Flush()
 	}

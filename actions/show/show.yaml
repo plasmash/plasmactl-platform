@@ -8,9 +8,9 @@ action:
       description: The name of the platform to show
       required: true
   options:
-    - name: format
+    - name: output
       shorthand: o
       title: Output Format
-      description: Output format (table, json, yaml)
+      description: Output format (json, yaml). Default is human-readable.
       type: string
-      default: "table"
+      default: ""
