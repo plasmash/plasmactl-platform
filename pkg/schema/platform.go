@@ -1,5 +1,6 @@
-// Package types defines YAML struct types for platform configuration
-package types
+// Package schema defines the canonical Platform type for platform.yaml configuration.
+// This is the public API consumed by other plasmactl plugins (e.g., plasmactl-node).
+package schema
 
 // Platform represents the platform.yaml configuration
 type Platform struct {

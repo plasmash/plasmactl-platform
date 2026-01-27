@@ -12,7 +12,6 @@ A [Launchr](https://github.com/launchrctl/launchr) plugin for [Plasmactl](https:
 - **Multi-Step Orchestration**: Executes bump, compose, prepare, and deploy in sequence
 - **CI/CD Integration**: Triggers pipelines in GitLab, GitHub Actions, and other systems
 - **DNS Configuration**: Automatic DNS setup (MX, DKIM, DMARC, SPF, rDNS)
-- **Configuration Management**: Get, set, list, validate, rotate config values
 - **Environment-Aware**: Deploy to dev, staging, production environments
 
 ## Commands
@@ -32,6 +31,9 @@ plasmactl platform:up dev interaction.applications.dashboards
 
 # Local deployment (skip CI/CD)
 plasmactl platform:up --local dev platform.interaction.observability
+
+# Skip certain phases
+plasmactl platform:up --skip-bump --skip-prepare dev platform.interaction.observability
 ```
 
 Options:
@@ -69,6 +71,9 @@ plasmactl platform:list
 plasmactl platform:list --format json
 ```
 
+Options:
+- `--format`: Output format (table, json, yaml)
+
 #### platform:show
 
 Show platform details:
@@ -78,6 +83,9 @@ plasmactl platform:show ski-dev
 plasmactl platform:show ski-dev --format json
 ```
 
+Options:
+- `--format`: Output format (table, json, yaml)
+
 #### platform:validate
 
 Validate platform configuration:
@@ -86,6 +94,10 @@ Validate platform configuration:
 plasmactl platform:validate ski-dev
 plasmactl platform:validate ski-dev --skip-dns --skip-mail
 ```
+
+Options:
+- `--skip-dns`: Skip DNS validation
+- `--skip-mail`: Skip mail configuration validation
 
 #### platform:deploy
 
@@ -113,52 +125,41 @@ plasmactl platform:destroy ski-dev
 plasmactl platform:destroy ski-dev --yes-i-am-sure
 ```
 
-### Config Commands
+Options:
+- `--yes-i-am-sure`: Skip confirmation prompt
 
-#### config:get
+## Project Structure
 
-Get a configuration value:
-
-```bash
-plasmactl config:get platform.deploy.gitlab_domain
-plasmactl config:get auth_kratos_db_password --vault
 ```
-
-#### config:set
-
-Set a configuration value:
-
-```bash
-plasmactl config:set platform.deploy.gitlab_domain=gitlab.example.com
-plasmactl config:set auth_kratos_db_password=secret --vault
-```
-
-#### config:list
-
-List configuration values:
-
-```bash
-plasmactl config:list
-plasmactl config:list auth_kratos
-plasmactl config:list --vault
-```
-
-#### config:validate
-
-Validate configuration against schemas:
-
-```bash
-plasmactl config:validate
-plasmactl config:validate auth_kratos --strict
-```
-
-#### config:rotate
-
-Rotate secrets:
-
-```bash
-plasmactl config:rotate
-plasmactl config:rotate auth_kratos_db_password
+plasmactl-platform/
+├── plugin.go                        # Plugin registration
+├── actions/
+│   ├── create/
+│   │   ├── create.yaml              # Action definition
+│   │   └── create.go                # Implementation
+│   ├── deploy/
+│   │   ├── deploy.yaml
+│   │   └── deploy.go
+│   ├── destroy/
+│   │   ├── destroy.yaml
+│   │   └── destroy.go
+│   ├── list/
+│   │   ├── list.yaml
+│   │   └── list.go
+│   ├── show/
+│   │   ├── show.yaml
+│   │   └── show.go
+│   ├── up/
+│   │   ├── up.yaml
+│   │   └── up.go
+│   └── validate/
+│       ├── validate.yaml
+│       └── validate.go
+└── internal/
+    ├── ci/                          # CI/CD integration
+    │   └── ci.go                    # Pipeline triggering
+    └── git/                         # Git operations
+        └── git.go                   # Repository operations
 ```
 
 ## Deployment Workflow
@@ -171,8 +172,8 @@ plasmactl platform:up dev platform.interaction.observability
 
 Executes:
 1. **Bump**: `plasmactl component:bump`
-2. **Compose**: `plasmactl package:compose`
-3. **Prepare**: `plasmactl platform:prepare` (if available)
+2. **Compose**: `plasmactl model:compose`
+3. **Prepare**: `plasmactl model:prepare`
 4. **Deploy**: `plasmactl platform:deploy`
 
 ### End-to-End Platform Setup
@@ -212,16 +213,29 @@ inst/
 plasmactl keyring:login gitlab
 ```
 
+The plugin triggers GitLab CI pipelines when deploying without `--local`.
+
 ### GitHub Actions
 
 ```bash
 plasmactl keyring:login github
 ```
 
+## Related Commands
+
+| Plugin | Command | Purpose |
+|--------|---------|---------|
+| plasmactl-node | `node:provision` | Provision infrastructure |
+| plasmactl-node | `node:allocate` | Allocate nodes to chassis |
+| plasmactl-model | `model:compose` | Compose packages |
+| plasmactl-model | `model:prepare` | Prepare for deployment |
+| plasmactl-component | `component:bump` | Bump versions |
+
 ## Documentation
 
 - [Plasmactl](https://github.com/plasmash/plasmactl) - Main CLI tool
 - [plasmactl-node](https://github.com/plasmash/plasmactl-node) - Node provisioning
+- [plasmactl-model](https://github.com/plasmash/plasmactl-model) - Model composition
 - [Plasma Platform](https://plasma.sh) - Platform documentation
 
 ## License

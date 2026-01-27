@@ -1,4 +1,4 @@
-package plasmactlplatform
+package ci
 
 import (
 	"bytes"
@@ -17,14 +17,16 @@ import (
 	"github.com/launchrctl/launchr/pkg/action"
 )
 
-const targetJobName = "platform:deploy"
+// TargetJobName is the name of the job to trigger in CI pipelines
+const TargetJobName = "platform:deploy"
 
-type continuousIntegration struct {
+// ContinuousIntegration provides CI/CD operations for GitLab
+type ContinuousIntegration struct {
 	action.WithLogger
 	action.WithTerm
 }
 
-// Job struct for listing jobs in the pipeline
+// Job represents a GitLab CI job
 type Job struct {
 	ID           int    `json:"id"`
 	Name         string `json:"name"`
@@ -33,9 +35,10 @@ type Job struct {
 	AllowFailure bool   `json:"allow_failure"`
 }
 
+// GetOAuthTokens gets OAuth tokens from Ory and GitLab
 // 1. orySessionToken is used only to request GitLab OAuth token.
 // 2. gitlabAccessToken is used in Authorization headers for all subsequent GitLab API calls.
-func (c *continuousIntegration) getOAuthTokens(gitlabDomain, username, password string) (string, error) {
+func (c *ContinuousIntegration) GetOAuthTokens(gitlabDomain, username, password string) (string, error) {
 	// Get ui.action URL from Ory self‐service login flow JSON
 	oryDomain := "https://auth.skilld.cloud"
 	oryLoginApiPath := "/self-service/login/api"
@@ -185,7 +188,8 @@ func (c *continuousIntegration) getOAuthTokens(gitlabDomain, username, password 
 	return oauthResp.AccessToken, nil
 }
 
-func (c *continuousIntegration) getBranchName() (string, error) {
+// GetBranchName returns the current git branch name
+func (c *ContinuousIntegration) GetBranchName() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {
@@ -194,7 +198,8 @@ func (c *continuousIntegration) getBranchName() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-func (c *continuousIntegration) getRepoName() (string, error) {
+// GetRepoName returns the repository name from remote origin URL
+func (c *ContinuousIntegration) GetRepoName() (string, error) {
 	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
 	output, err := cmd.Output()
 	if err != nil {
@@ -205,9 +210,9 @@ func (c *continuousIntegration) getRepoName() (string, error) {
 	return strings.TrimSuffix(repoParts[len(repoParts)-1], ".git"), nil
 }
 
-// getProjectID calls GitLab API "/projects?search=<repoName>",
+// GetProjectID calls GitLab API "/projects?search=<repoName>",
 // sets Header "Authorization: Bearer <gitlabAccessToken>", and checks HTTP status first.
-func (c *continuousIntegration) getProjectID(gitlabDomain, gitlabAccessToken, repoName string) (string, error) {
+func (c *ContinuousIntegration) GetProjectID(gitlabDomain, gitlabAccessToken, repoName string) (string, error) {
 	apiURL := fmt.Sprintf("%s/api/v4/projects?search=%s", gitlabDomain, url.QueryEscape(repoName))
 	c.Log().Debug("GitLab API URL to get project ID", "url", apiURL)
 
@@ -245,9 +250,9 @@ func (c *continuousIntegration) getProjectID(gitlabDomain, gitlabAccessToken, re
 	return fmt.Sprintf("%.0f", projects[0]["id"].(float64)), nil
 }
 
-// triggerPipeline calls GitLab API "/projects/<projectID>/pipeline",
+// TriggerPipeline calls GitLab API "/projects/<projectID>/pipeline",
 // sets Header "Authorization: Bearer <gitlabAccessToken>"
-func (c *continuousIntegration) triggerPipeline(gitlabDomain, gitlabAccessToken, projectID, branchName, buildEnv, buildResources string, ansibleDebug bool) (int, error) {
+func (c *ContinuousIntegration) TriggerPipeline(gitlabDomain, gitlabAccessToken, projectID, branchName, buildEnv, buildResources string, ansibleDebug bool) (int, error) {
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/pipeline", gitlabDomain, projectID)
 	c.Log().Debug("GitLab API URL for triggering pipeline", "url", apiURL)
 
@@ -342,9 +347,9 @@ func (c *continuousIntegration) triggerPipeline(gitlabDomain, gitlabAccessToken,
 	return pipelineResp.ID, nil
 }
 
-// getJobsInPipeline calls GitLab API "/projects/<projectID>/pipelines/<pipelineID>/jobs",
+// GetJobsInPipeline calls GitLab API "/projects/<projectID>/pipelines/<pipelineID>/jobs",
 // sets Header "Authorization: Bearer <gitlabAccessToken>"
-func (c *continuousIntegration) getJobsInPipeline(gitlabDomain, gitlabAccessToken, projectID string, pipelineID int) ([]Job, error) {
+func (c *ContinuousIntegration) GetJobsInPipeline(gitlabDomain, gitlabAccessToken, projectID string, pipelineID int) ([]Job, error) {
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/pipelines/%d/jobs", gitlabDomain, projectID, pipelineID)
 	c.Log().Debug("GitLab API URL for retrieving jobs", "url", apiURL)
 
@@ -379,9 +384,9 @@ func (c *continuousIntegration) getJobsInPipeline(gitlabDomain, gitlabAccessToke
 	return jobs, nil
 }
 
-// getJobTrace calls GitLab API "/projects/<projectID>/jobs/<jobID>/trace",
+// GetJobTrace calls GitLab API "/projects/<projectID>/jobs/<jobID>/trace",
 // sets Header "Authorization: Bearer <gitlabAccessToken>" and tails the log until completion
-func (c *continuousIntegration) getJobTrace(gitlabDomain, gitlabAccessToken, projectID string, jobID int) error {
+func (c *ContinuousIntegration) GetJobTrace(gitlabDomain, gitlabAccessToken, projectID string, jobID int) error {
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/jobs/%d/trace", gitlabDomain, projectID, jobID)
 	c.Log().Debug("GitLab API URL for retrieving job trace", "url", apiURL)
 
@@ -444,7 +449,7 @@ func (c *continuousIntegration) getJobTrace(gitlabDomain, gitlabAccessToken, pro
 
 // jobCompleted determines if a GitLab job trace indicates completion.
 // Returns (exitCode, true) if completed; otherwise (1, false).
-func (c *continuousIntegration) jobCompleted(traceContent string) (int, bool) {
+func (c *ContinuousIntegration) jobCompleted(traceContent string) (int, bool) {
 	if strings.Contains(traceContent, "Job succeeded") {
 		return 0, true
 	}
@@ -467,7 +472,7 @@ func (c *continuousIntegration) jobCompleted(traceContent string) (int, bool) {
 }
 
 // fetchTrace performs the GET request to the given trace URL, passing Header "Authorization: Bearer <gitlabAccessToken>"
-func (c *continuousIntegration) fetchTrace(apiURL, gitlabAccessToken string) (string, error) {
+func (c *ContinuousIntegration) fetchTrace(apiURL, gitlabAccessToken string) (string, error) {
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return "", err
@@ -489,9 +494,9 @@ func (c *continuousIntegration) fetchTrace(apiURL, gitlabAccessToken string) (st
 	return string(body), nil
 }
 
-// triggerManualJob calls GitLab API "/projects/<projectID>/jobs/<jobID>/play",
+// TriggerManualJob calls GitLab API "/projects/<projectID>/jobs/<jobID>/play",
 // sets Header "Authorization: Bearer <gitlabAccessToken>"
-func (c *continuousIntegration) triggerManualJob(gitlabDomain, gitlabAccessToken, projectID string, jobID int, pipelineID int) error {
+func (c *ContinuousIntegration) TriggerManualJob(gitlabDomain, gitlabAccessToken, projectID string, jobID int, pipelineID int) error {
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/jobs/%d/play", gitlabDomain, projectID, jobID)
 	c.Log().Debug("GitLab API URL for triggering manual job", "url", apiURL)
 
@@ -508,7 +513,7 @@ func (c *continuousIntegration) triggerManualJob(gitlabDomain, gitlabAccessToken
 	}()
 
 	// Retrieve all jobs to determine the stage of the target job
-	allJobs, err := c.getJobsInPipeline(gitlabDomain, gitlabAccessToken, projectID, pipelineID)
+	allJobs, err := c.GetJobsInPipeline(gitlabDomain, gitlabAccessToken, projectID, pipelineID)
 	if err != nil {
 		return err
 	}
@@ -522,12 +527,12 @@ func (c *continuousIntegration) triggerManualJob(gitlabDomain, gitlabAccessToken
 		}
 	}
 	if targetJobStage == "" {
-		return fmt.Errorf("stage of %s job not found", targetJobName)
+		return fmt.Errorf("stage of %s job not found", TargetJobName)
 	}
 
 	for i := 0; i < maxRetries; i++ {
 		// Check the status of jobs in previous stages
-		jobs, err := c.getJobsInPipeline(gitlabDomain, gitlabAccessToken, projectID, pipelineID)
+		jobs, err := c.GetJobsInPipeline(gitlabDomain, gitlabAccessToken, projectID, pipelineID)
 		if err != nil {
 			return err
 		}
@@ -549,7 +554,7 @@ func (c *continuousIntegration) triggerManualJob(gitlabDomain, gitlabAccessToken
 
 		// If there are failed jobs, no need to retry further
 		if len(failed) > 0 {
-			return fmt.Errorf("cannot trigger %s job due to failed jobs: %v", targetJobName, failed)
+			return fmt.Errorf("cannot trigger %s job due to failed jobs: %v", TargetJobName, failed)
 		}
 
 		// If there are still jobs in progress, list them and wait before retrying
@@ -597,7 +602,7 @@ func (c *continuousIntegration) triggerManualJob(gitlabDomain, gitlabAccessToken
 			c.Term().Printfln("Job URL: %s", jobURL)
 
 			// Retrieve and print the job trace
-			if err := c.getJobTrace(gitlabDomain, gitlabAccessToken, projectID, jobID); err != nil {
+			if err := c.GetJobTrace(gitlabDomain, gitlabAccessToken, projectID, jobID); err != nil {
 				return fmt.Errorf("failed to retrieve job trace: %v", err)
 			}
 			return nil // End the program after successfully retrieving job trace
@@ -605,7 +610,7 @@ func (c *continuousIntegration) triggerManualJob(gitlabDomain, gitlabAccessToken
 
 		// Handle unplayable job response
 		if strings.Contains(string(body), "Unplayable Job") {
-			c.Term().Printfln("%s job cannot be played yet. Retrying in %v...", targetJobName, retryDelay)
+			c.Term().Printfln("%s job cannot be played yet. Retrying in %v...", TargetJobName, retryDelay)
 			time.Sleep(retryDelay)
 		} else {
 			return fmt.Errorf("failed to trigger job: %s", resp.Status)

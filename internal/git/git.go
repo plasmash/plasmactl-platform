@@ -1,4 +1,4 @@
-package plasmactlplatform
+package git
 
 import (
 	"bytes"
@@ -13,13 +13,14 @@ import (
 	"github.com/launchrctl/launchr/pkg/action"
 )
 
-type gitUp struct {
+// GitUp provides git operations for the platform:up workflow
+type GitUp struct {
 	action.WithLogger
 	action.WithTerm
 }
 
-// Checks for uncommitted changes and creates a commit if any are found
-func (g *gitUp) commitChangesIfAny() error {
+// CommitChangesIfAny checks for uncommitted changes and creates a commit if any are found
+func (g *GitUp) CommitChangesIfAny() error {
 	// Open the existing repository
 	repoPath, err := os.Getwd()
 	if err != nil {
@@ -75,7 +76,6 @@ func (g *gitUp) commitChangesIfAny() error {
 		return fmt.Errorf("failed to retrieve commit object: %w", err)
 	}
 
-	//fmt.Printf("Created %s\n", obj.String())
 	g.Term().Printf("Created commit %s\n", obj.Hash.String())
 	g.Term().Printf("Author: %s <%s>\n", obj.Author.Name, obj.Author.Email)
 	g.Term().Printf("Date:   %s\n", obj.Author.When.Format("Mon Jan 2 15:04:05 2006 -0700"))
@@ -84,8 +84,8 @@ func (g *gitUp) commitChangesIfAny() error {
 	return nil
 }
 
-// Checks for unpushed commits and pushes them if any are found
-func (g *gitUp) pushCommitsIfAny() error {
+// PushCommitsIfAny checks for unpushed commits and pushes them if any are found
+func (g *GitUp) PushCommitsIfAny() error {
 
 	// Check for un-pushed commits
 	cmdFetch := exec.Command("git", "fetch", "--quiet")
@@ -120,7 +120,8 @@ func (g *gitUp) pushCommitsIfAny() error {
 	return nil
 }
 
-func (g *gitUp) pushBranchIfNotRemote() error {
+// PushBranchIfNotRemote pushes the branch to remote if it doesn't exist there
+func (g *GitUp) PushBranchIfNotRemote() error {
 	// Verify the remote name
 	cmdRemote := exec.Command("git", "remote")
 	var remoteOut bytes.Buffer
