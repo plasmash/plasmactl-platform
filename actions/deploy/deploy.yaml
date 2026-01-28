@@ -20,12 +20,12 @@ action:
     - name: debug
       title: Debug
       description: Run ansible-playbook in verbose mode (-vvv)
-      type: bool
+      type: boolean
       default: false
     - name: check
       title: Check
       description: Run ansible-playbook in check mode (dry-run)
-      type: bool
+      type: boolean
       default: false
     - name: password
       title: Vault Password
@@ -38,7 +38,7 @@ action:
     - name: logs
       title: Logs
       description: Store output in deploy.log file
-      type: bool
+      type: boolean
       default: false
     - name: prepare-dir
       title: Prepare Directory

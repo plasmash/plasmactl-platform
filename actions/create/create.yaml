@@ -28,5 +28,5 @@ action:
     - name: skip-dns
       title: Skip DNS
       description: Skip DNS configuration (MX, DKIM, DMARC, SPF)
-      type: bool
+      type: boolean
       default: false
