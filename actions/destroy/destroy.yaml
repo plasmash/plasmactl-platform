@@ -11,10 +11,10 @@ action:
     - name: yes-i-am-sure
       title: Yes I Am Sure
       description: Skip confirmation prompt (for automation)
-      type: bool
+      type: boolean
       default: false
     - name: keep-dns
       title: Keep DNS
       description: Keep DNS records (don't delete MX, DKIM, DMARC, SPF)
-      type: bool
+      type: boolean
       default: false
