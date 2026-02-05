@@ -108,6 +108,84 @@ func (v *Validate) Execute() error {
 		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "domain", Status: "pass", Value: platform.DNS.Domain})
 	}
 
+	// Validate network configuration
+	v.Term().Info().Println()
+	v.Term().Info().Println("Network Configuration:")
+	if platform.Networking.PrivateNetwork == "" {
+		v.Term().Warning().Println("  ! Private network CIDR not configured")
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "private_network", Status: "warning"})
+		hasWarnings = true
+	} else if !isValidCIDR(platform.Networking.PrivateNetwork) {
+		v.Term().Error().Printfln("  ✗ Invalid private network CIDR: %s", platform.Networking.PrivateNetwork)
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "private_network", Status: "fail", Value: platform.Networking.PrivateNetwork})
+		hasErrors = true
+	} else {
+		v.Term().Success().Printfln("  ✓ Private network: %s", platform.Networking.PrivateNetwork)
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "private_network", Status: "pass", Value: platform.Networking.PrivateNetwork})
+	}
+
+	if platform.Networking.PrivateVIPNetwork != "" {
+		if !isValidCIDR(platform.Networking.PrivateVIPNetwork) {
+			v.Term().Error().Printfln("  ✗ Invalid VIP network CIDR: %s", platform.Networking.PrivateVIPNetwork)
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "vip_network", Status: "fail", Value: platform.Networking.PrivateVIPNetwork})
+			hasErrors = true
+		} else {
+			v.Term().Success().Printfln("  ✓ VIP network: %s", platform.Networking.PrivateVIPNetwork)
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "vip_network", Status: "pass", Value: platform.Networking.PrivateVIPNetwork})
+		}
+	}
+
+	// Validate API configuration
+	v.Term().Info().Println()
+	v.Term().Info().Println("API Configuration:")
+	if platform.Infrastructure.MetalProvider != "manual" {
+		if platform.Infrastructure.API.Token == "" {
+			v.Term().Warning().Println("  ! API token not configured")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "warning"})
+			hasWarnings = true
+		} else if strings.Contains(platform.Infrastructure.API.Token, "{{ .keyring.") {
+			v.Term().Success().Println("  ✓ API token configured (keyring reference)")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "pass", Value: "keyring"})
+		} else {
+			v.Term().Warning().Println("  ! API token is hardcoded (consider using keyring)")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "warning", Value: "hardcoded"})
+			hasWarnings = true
+		}
+	} else {
+		v.Term().Info().Println("  - Skipped (manual provider)")
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "pass", Value: "manual"})
+	}
+
+	// Validate chassis configuration
+	v.Term().Info().Println()
+	v.Term().Info().Println("Chassis Configuration:")
+	if len(platform.Chassis) == 0 {
+		v.Term().Warning().Println("  ! No chassis profiles defined")
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "chassis", Status: "warning", Value: "0"})
+		hasWarnings = true
+	} else {
+		totalNodes := 0
+		for chassis, profiles := range platform.Chassis {
+			for _, profile := range profiles {
+				if profile.Count <= 0 {
+					v.Term().Error().Printfln("  ✗ Invalid count for %s/%s: %d", chassis, profile.Type, profile.Count)
+					v.result.Checks = append(v.result.Checks, ValidationCheck{
+						Name:   fmt.Sprintf("chassis_%s", chassis),
+						Status: "fail",
+						Value:  fmt.Sprintf("%s: invalid count %d", profile.Type, profile.Count),
+					})
+					hasErrors = true
+				} else {
+					totalNodes += profile.Count
+				}
+			}
+		}
+		if totalNodes > 0 {
+			v.Term().Success().Printfln("  ✓ Chassis profiles: %d paths, %d total nodes", len(platform.Chassis), totalNodes)
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "chassis", Status: "pass", Value: fmt.Sprintf("%d paths", len(platform.Chassis))})
+		}
+	}
+
 	// Validate DNS if not skipped
 	if !v.SkipDNS && platform.DNS.Domain != "" {
 		v.Term().Info().Println()
@@ -225,4 +303,10 @@ func (v *Validate) validateMailAuth(domain string, hasErrors *bool) {
 	if !hasDKIM {
 		v.Term().Warning().Println("  ! DKIM record not found (selector: default)")
 	}
+}
+
+// isValidCIDR checks if a string is a valid CIDR notation
+func isValidCIDR(cidr string) bool {
+	_, _, err := net.ParseCIDR(cidr)
+	return err == nil
 }
