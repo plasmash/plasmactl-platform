@@ -7,28 +7,43 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 	"github.com/plasmash/plasmactl-platform/pkg/schema"
 	"gopkg.in/yaml.v3"
 )
 
+// ValidationCheck represents a single validation check result
+type ValidationCheck struct {
+	Name   string `json:"name"`
+	Status string `json:"status"` // "pass", "fail", "warning"
+	Value  string `json:"value,omitempty"`
+}
+
+// ValidateResult is the structured output for platform:validate
+type ValidateResult struct {
+	Name       string            `json:"name"`
+	Valid      bool              `json:"valid"`
+	Checks     []ValidationCheck `json:"checks"`
+	NodeCount  int               `json:"node_count"`
+	HasErrors  bool              `json:"has_errors"`
+	HasWarning bool              `json:"has_warnings"`
+}
+
 // Validate implements the platform:validate command
 type Validate struct {
-	Log      *launchr.Logger
-	Term     *launchr.Terminal
+	action.WithLogger
+	action.WithTerm
+
 	Name     string
 	SkipDNS  bool
 	SkipMail bool
+
+	result *ValidateResult
 }
 
-// SetLogger sets the logger for the action
-func (v *Validate) SetLogger(log *launchr.Logger) {
-	v.Log = log
-}
-
-// SetTerm sets the terminal for the action
-func (v *Validate) SetTerm(term *launchr.Terminal) {
-	v.Term = term
+// Result returns the structured result for JSON output
+func (v *Validate) Result() any {
+	return v.result
 }
 
 // Execute runs the platform:validate action
@@ -52,44 +67,58 @@ func (v *Validate) Execute() error {
 		return fmt.Errorf("failed to parse platform.yaml: %w", err)
 	}
 
-	v.Term.Info().Printfln("Validating platform %q...", v.Name)
-	v.Term.Info().Println()
+	v.Term().Info().Printfln("Validating platform %q...", v.Name)
+	v.Term().Info().Println()
+
+	// Initialize result
+	v.result = &ValidateResult{
+		Name:   v.Name,
+		Checks: []ValidationCheck{},
+	}
 
 	hasErrors := false
+	hasWarnings := false
 
 	// Validate basic configuration
-	v.Term.Info().Println("Basic Configuration:")
+	v.Term().Info().Println("Basic Configuration:")
 	if platform.Name == "" {
-		v.Term.Error().Println("  ✗ Name is missing")
+		v.Term().Error().Println("  ✗ Name is missing")
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "name", Status: "fail"})
 		hasErrors = true
 	} else {
-		v.Term.Success().Printfln("  ✓ Name: %s", platform.Name)
+		v.Term().Success().Printfln("  ✓ Name: %s", platform.Name)
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "name", Status: "pass", Value: platform.Name})
 	}
 
 	if platform.Infrastructure.MetalProvider == "" {
-		v.Term.Error().Println("  ✗ Metal provider is missing")
+		v.Term().Error().Println("  ✗ Metal provider is missing")
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "metal_provider", Status: "fail"})
 		hasErrors = true
 	} else {
-		v.Term.Success().Printfln("  ✓ Metal provider: %s", platform.Infrastructure.MetalProvider)
+		v.Term().Success().Printfln("  ✓ Metal provider: %s", platform.Infrastructure.MetalProvider)
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "metal_provider", Status: "pass", Value: platform.Infrastructure.MetalProvider})
 	}
 
 	if platform.DNS.Domain == "" {
-		v.Term.Warning().Println("  ! Domain is not configured")
+		v.Term().Warning().Println("  ! Domain is not configured")
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "domain", Status: "warning"})
+		hasWarnings = true
 	} else {
-		v.Term.Success().Printfln("  ✓ Domain: %s", platform.DNS.Domain)
+		v.Term().Success().Printfln("  ✓ Domain: %s", platform.DNS.Domain)
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "domain", Status: "pass", Value: platform.DNS.Domain})
 	}
 
 	// Validate DNS if not skipped
 	if !v.SkipDNS && platform.DNS.Domain != "" {
-		v.Term.Info().Println()
-		v.Term.Info().Println("DNS Records:")
+		v.Term().Info().Println()
+		v.Term().Info().Println("DNS Records:")
 		v.validateDNS(platform.DNS.Domain, &hasErrors)
 	}
 
 	// Validate mail authentication if not skipped
 	if !v.SkipMail && platform.DNS.Domain != "" {
-		v.Term.Info().Println()
-		v.Term.Info().Println("Mail Authentication:")
+		v.Term().Info().Println()
+		v.Term().Info().Println("Mail Authentication:")
 		v.validateMailAuth(platform.DNS.Domain, &hasErrors)
 	}
 
@@ -104,21 +133,30 @@ func (v *Validate) Execute() error {
 		}
 	}
 
-	v.Term.Info().Println()
-	v.Term.Info().Println("Infrastructure:")
+	v.Term().Info().Println()
+	v.Term().Info().Println("Infrastructure:")
 	if nodeCount == 0 {
-		v.Term.Warning().Println("  ! No nodes provisioned")
+		v.Term().Warning().Println("  ! No nodes provisioned")
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "nodes", Status: "warning", Value: "0"})
+		hasWarnings = true
 	} else {
-		v.Term.Success().Printfln("  ✓ Nodes: %d", nodeCount)
+		v.Term().Success().Printfln("  ✓ Nodes: %d", nodeCount)
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "nodes", Status: "pass", Value: fmt.Sprintf("%d", nodeCount)})
 	}
 
-	v.Term.Info().Println()
+	// Finalize result
+	v.result.NodeCount = nodeCount
+	v.result.HasErrors = hasErrors
+	v.result.HasWarning = hasWarnings
+	v.result.Valid = !hasErrors
+
+	v.Term().Info().Println()
 	if hasErrors {
-		v.Term.Error().Println("Validation failed with errors")
+		v.Term().Error().Println("Validation failed with errors")
 		return fmt.Errorf("validation failed")
 	}
 
-	v.Term.Success().Println("Validation passed")
+	v.Term().Success().Println("Validation passed")
 	return nil
 }
 
@@ -127,20 +165,20 @@ func (v *Validate) validateDNS(domain string, hasErrors *bool) {
 	// Check MX records
 	mxRecords, err := net.LookupMX(domain)
 	if err != nil || len(mxRecords) == 0 {
-		v.Term.Warning().Println("  ! MX records not found")
+		v.Term().Warning().Println("  ! MX records not found")
 	} else {
-		v.Term.Success().Printfln("  ✓ MX records: %d found", len(mxRecords))
+		v.Term().Success().Printfln("  ✓ MX records: %d found", len(mxRecords))
 		for _, mx := range mxRecords {
-			v.Term.Info().Printfln("      %s (priority %d)", mx.Host, mx.Pref)
+			v.Term().Info().Printfln("      %s (priority %d)", mx.Host, mx.Pref)
 		}
 	}
 
 	// Check A/AAAA records
 	ips, err := net.LookupIP(domain)
 	if err != nil || len(ips) == 0 {
-		v.Term.Warning().Println("  ! A/AAAA records not found")
+		v.Term().Warning().Println("  ! A/AAAA records not found")
 	} else {
-		v.Term.Success().Printfln("  ✓ A/AAAA records: %d found", len(ips))
+		v.Term().Success().Printfln("  ✓ A/AAAA records: %d found", len(ips))
 	}
 }
 
@@ -152,12 +190,12 @@ func (v *Validate) validateMailAuth(domain string, hasErrors *bool) {
 	for _, txt := range txtRecords {
 		if strings.HasPrefix(txt, "v=spf1") {
 			hasSPF = true
-			v.Term.Success().Println("  ✓ SPF record found")
+			v.Term().Success().Println("  ✓ SPF record found")
 			break
 		}
 	}
 	if !hasSPF {
-		v.Term.Warning().Println("  ! SPF record not found")
+		v.Term().Warning().Println("  ! SPF record not found")
 	}
 
 	// Check DMARC record
@@ -166,12 +204,12 @@ func (v *Validate) validateMailAuth(domain string, hasErrors *bool) {
 	for _, txt := range dmarcRecords {
 		if strings.HasPrefix(txt, "v=DMARC1") {
 			hasDMARC = true
-			v.Term.Success().Println("  ✓ DMARC record found")
+			v.Term().Success().Println("  ✓ DMARC record found")
 			break
 		}
 	}
 	if !hasDMARC {
-		v.Term.Warning().Println("  ! DMARC record not found")
+		v.Term().Warning().Println("  ! DMARC record not found")
 	}
 
 	// Check DKIM record (common selector: default)
@@ -180,11 +218,11 @@ func (v *Validate) validateMailAuth(domain string, hasErrors *bool) {
 	for _, txt := range dkimRecords {
 		if strings.Contains(txt, "v=DKIM1") {
 			hasDKIM = true
-			v.Term.Success().Println("  ✓ DKIM record found (selector: default)")
+			v.Term().Success().Println("  ✓ DKIM record found (selector: default)")
 			break
 		}
 	}
 	if !hasDKIM {
-		v.Term.Warning().Println("  ! DKIM record not found (selector: default)")
+		v.Term().Warning().Println("  ! DKIM record not found (selector: default)")
 	}
 }

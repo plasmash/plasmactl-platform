@@ -9,27 +9,32 @@ import (
 
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 )
+
+// DestroyResult is the structured output for platform:destroy
+type DestroyResult struct {
+	Name    string `json:"name"`
+	Success bool   `json:"success"`
+}
 
 // Destroy implements the platform:destroy command
 type Destroy struct {
-	Log     *launchr.Logger
-	Term    *launchr.Terminal
+	action.WithLogger
+	action.WithTerm
+
 	Keyring keyring.Keyring
 
 	Name       string
 	YesIAmSure bool
 	KeepDNS    bool
+
+	result *DestroyResult
 }
 
-// SetLogger sets the logger for the action
-func (d *Destroy) SetLogger(log *launchr.Logger) {
-	d.Log = log
-}
-
-// SetTerm sets the terminal for the action
-func (d *Destroy) SetTerm(term *launchr.Terminal) {
-	d.Term = term
+// Result returns the structured result for JSON output
+func (d *Destroy) Result() any {
+	return d.result
 }
 
 // Execute runs the platform:destroy action
@@ -43,7 +48,7 @@ func (d *Destroy) Execute() error {
 
 	// Confirm destruction
 	if !d.YesIAmSure {
-		confirmed, err := confirmDestroy(d.Term, "platform", d.Name)
+		confirmed, err := confirmDestroy(d.Term(), "platform", d.Name)
 		if err != nil {
 			return err
 		}
@@ -52,13 +57,13 @@ func (d *Destroy) Execute() error {
 		}
 	}
 
-	d.Term.Info().Printfln("Destroying platform %q...", d.Name)
+	d.Term().Info().Printfln("Destroying platform %q...", d.Name)
 
 	// TODO: Destroy DNS records if not --keep-dns
 	if !d.KeepDNS {
-		d.Term.Info().Println("  Removing DNS records...")
+		d.Term().Info().Println("  Removing DNS records...")
 		// DNS removal via Terraform would go here
-		d.Term.Warning().Println("  DNS removal not yet implemented")
+		d.Term().Warning().Println("  DNS removal not yet implemented")
 	}
 
 	// TODO: Destroy nodes via Terraform
@@ -68,19 +73,25 @@ func (d *Destroy) Execute() error {
 		for _, nodeEntry := range nodeEntries {
 			if !nodeEntry.IsDir() && filepath.Ext(nodeEntry.Name()) == ".yaml" && nodeEntry.Name() != ".gitkeep" {
 				nodeName := nodeEntry.Name()[:len(nodeEntry.Name())-5]
-				d.Term.Info().Printfln("  Would destroy node: %s", nodeName)
+				d.Term().Info().Printfln("  Would destroy node: %s", nodeName)
 				// node destruction via Terraform would go here
 			}
 		}
 	}
 
 	// Remove the environment directory
-	d.Term.Info().Println("  Removing platform directory...")
+	d.Term().Info().Println("  Removing platform directory...")
 	if err := os.RemoveAll(instDir); err != nil {
 		return fmt.Errorf("failed to remove platform directory: %w", err)
 	}
 
-	d.Term.Success().Printfln("Platform %q destroyed", d.Name)
+	// Build result
+	d.result = &DestroyResult{
+		Name:    d.Name,
+		Success: true,
+	}
+
+	d.Term().Success().Printfln("Platform %q destroyed", d.Name)
 	return nil
 }
 

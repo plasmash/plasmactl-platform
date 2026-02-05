@@ -6,15 +6,25 @@ import (
 	"path/filepath"
 
 	"github.com/launchrctl/keyring"
-	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 	"github.com/plasmash/plasmactl-platform/pkg/schema"
 	"gopkg.in/yaml.v3"
 )
 
+// CreateResult is the structured output for platform:create
+type CreateResult struct {
+	Name          string `json:"name"`
+	MetalProvider string `json:"metal_provider"`
+	DNSProvider   string `json:"dns_provider"`
+	Domain        string `json:"domain"`
+	Path          string `json:"path"`
+}
+
 // Create implements the platform:create command
 type Create struct {
-	Log     *launchr.Logger
-	Term    *launchr.Terminal
+	action.WithLogger
+	action.WithTerm
+
 	Keyring keyring.Keyring
 
 	Name          string
@@ -22,16 +32,13 @@ type Create struct {
 	DNSProvider   string
 	Domain        string
 	SkipDNS       bool
+
+	result *CreateResult
 }
 
-// SetLogger sets the logger for the action
-func (c *Create) SetLogger(log *launchr.Logger) {
-	c.Log = log
-}
-
-// SetTerm sets the terminal for the action
-func (c *Create) SetTerm(term *launchr.Terminal) {
-	c.Term = term
+// Result returns the structured result for JSON output
+func (c *Create) Result() any {
+	return c.result
 }
 
 // Execute runs the platform:create action
@@ -45,10 +52,10 @@ func (c *Create) Execute() error {
 		return fmt.Errorf("platform %q already exists at %s", c.Name, instDir)
 	}
 
-	c.Term.Info().Printfln("Creating platform %q", c.Name)
-	c.Term.Info().Printfln("  Metal provider: %s", c.MetalProvider)
-	c.Term.Info().Printfln("  DNS provider: %s", c.DNSProvider)
-	c.Term.Info().Printfln("  Domain: %s", c.Domain)
+	c.Term().Info().Printfln("Creating platform %q", c.Name)
+	c.Term().Info().Printfln("  Metal provider: %s", c.MetalProvider)
+	c.Term().Info().Printfln("  DNS provider: %s", c.DNSProvider)
+	c.Term().Info().Printfln("  Domain: %s", c.Domain)
 
 	// Create directories
 	if err := os.MkdirAll(nodesDir, 0755); err != nil {
@@ -94,36 +101,45 @@ func (c *Create) Execute() error {
 		return fmt.Errorf("failed to write .gitkeep: %w", err)
 	}
 
-	c.Term.Success().Printfln("Created platform scaffold at %s", instDir)
+	// Build result
+	c.result = &CreateResult{
+		Name:          c.Name,
+		MetalProvider: c.MetalProvider,
+		DNSProvider:   c.DNSProvider,
+		Domain:        c.Domain,
+		Path:          instDir,
+	}
+
+	c.Term().Success().Printfln("Created platform scaffold at %s", instDir)
 
 	// Configure DNS if not skipped and not manual
 	if !c.SkipDNS && c.DNSProvider != "manual" {
-		c.Term.Info().Println()
-		c.Term.Info().Println("Configuring DNS records...")
+		c.Term().Info().Println()
+		c.Term().Info().Println("Configuring DNS records...")
 		if err := c.configureDNS(); err != nil {
-			c.Term.Warning().Printfln("DNS configuration failed: %v", err)
-			c.Term.Warning().Println("You can configure DNS manually or retry with platform:validate")
+			c.Term().Warning().Printfln("DNS configuration failed: %v", err)
+			c.Term().Warning().Println("You can configure DNS manually or retry with platform:validate")
 		} else {
-			c.Term.Success().Println("DNS records configured successfully")
+			c.Term().Success().Println("DNS records configured successfully")
 		}
 	}
 
 	// Print next steps
-	c.Term.Info().Println()
-	c.Term.Info().Println("Next steps:")
+	c.Term().Info().Println()
+	c.Term().Info().Println("Next steps:")
 	if c.MetalProvider != "manual" {
-		c.Term.Info().Printfln("  1. Ensure credentials are configured: plasmactl keyring:login %s", c.MetalProvider)
+		c.Term().Info().Printfln("  1. Ensure credentials are configured: plasmactl keyring:login %s", c.MetalProvider)
 		if c.DNSProvider != "manual" && c.DNSProvider != c.MetalProvider {
-			c.Term.Info().Printfln("  2. Ensure DNS credentials: plasmactl keyring:login %s", c.DNSProvider)
-			c.Term.Info().Printfln("  3. Provision nodes: plasmactl node:provision %s -c <chassis>:<offer>:<count>", c.Name)
+			c.Term().Info().Printfln("  2. Ensure DNS credentials: plasmactl keyring:login %s", c.DNSProvider)
+			c.Term().Info().Printfln("  3. Provision nodes: plasmactl node:provision %s -c <chassis>:<offer>:<count>", c.Name)
 		} else {
-			c.Term.Info().Printfln("  2. Provision nodes: plasmactl node:provision %s -c <chassis>:<offer>:<count>", c.Name)
+			c.Term().Info().Printfln("  2. Provision nodes: plasmactl node:provision %s -c <chassis>:<offer>:<count>", c.Name)
 		}
 	} else {
-		c.Term.Info().Printfln("  1. Add nodes: plasmactl node:add %s --hostname <name> --public-ip <ip>", c.Name)
-		c.Term.Info().Printfln("  2. Or create node YAML files directly in %s", nodesDir)
+		c.Term().Info().Printfln("  1. Add nodes: plasmactl node:add %s --hostname <name> --public-ip <ip>", c.Name)
+		c.Term().Info().Printfln("  2. Or create node YAML files directly in %s", nodesDir)
 	}
-	c.Term.Info().Printfln("  3. Deploy: plasmactl platform:deploy %s", c.Name)
+	c.Term().Info().Printfln("  3. Deploy: plasmactl platform:deploy %s", c.Name)
 
 	return nil
 }
@@ -140,9 +156,8 @@ func (c *Create) configureDNS() error {
 	//    - SPF records
 	//    - rDNS (if supported by provider)
 
-	c.Term.Info().Println("  DNS configuration via Terraform is not yet implemented")
-	c.Term.Info().Println("  Manual DNS setup required for now")
+	c.Term().Info().Println("  DNS configuration via Terraform is not yet implemented")
+	c.Term().Info().Println("  Manual DNS setup required for now")
 
 	return nil
 }
-

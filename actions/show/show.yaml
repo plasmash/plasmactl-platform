@@ -1,7 +1,7 @@
 runtime: plugin
 action:
   title: Show Platform
-  description: "Show details of a platform including DNS status"
+  description: "Show details of a platform including configuration and nodes"
   arguments:
     - name: name
       title: Name

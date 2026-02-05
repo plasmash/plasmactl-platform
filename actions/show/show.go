@@ -1,27 +1,44 @@
 package show
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 	"github.com/plasmash/plasmactl-platform/pkg/schema"
 	"gopkg.in/yaml.v3"
 )
 
-// Show implements the platform:show command
-type Show struct {
-	Log    *launchr.Logger
-	Term   *launchr.Terminal
-	Name   string
-	Format string
+// DNSStatus represents the DNS configuration status
+type DNSStatus struct {
+	Provider   string `json:"provider"`
+	Domain     string `json:"domain"`
+	Configured bool   `json:"configured"`
 }
 
-func (s *Show) SetLogger(log *launchr.Logger) { s.Log = log }
-func (s *Show) SetTerm(term *launchr.Terminal) { s.Term = term }
+// ShowResult is the structured output for platform:show
+type ShowResult struct {
+	Platform schema.Platform `json:"platform"`
+	Nodes    []string        `json:"nodes"`
+	DNS      DNSStatus       `json:"dns"`
+}
+
+// Show implements the platform:show command
+type Show struct {
+	action.WithLogger
+	action.WithTerm
+
+	Name   string
+	Format string
+
+	result *ShowResult
+}
+
+// Result returns the structured result for JSON output
+func (s *Show) Result() any {
+	return s.result
+}
 
 func (s *Show) Execute() error {
 	instDir := filepath.Join("inst", s.Name)
@@ -54,55 +71,50 @@ func (s *Show) Execute() error {
 		}
 	}
 
-	// Output based on format
-	switch strings.ToLower(s.Format) {
-	case "json":
-		output := map[string]interface{}{
-			"platform": platform,
-			"nodes":    nodes,
-		}
-		jsonData, err := json.MarshalIndent(output, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(jsonData))
+	// Determine DNS configuration status
+	dnsConfigured := platform.DNS.Domain != "" && platform.DNS.Provider != ""
+	dnsStatus := DNSStatus{
+		Provider:   platform.DNS.Provider,
+		Domain:     platform.DNS.Domain,
+		Configured: dnsConfigured,
+	}
 
-	case "yaml":
-		output := map[string]interface{}{
-			"platform": platform,
-			"nodes":    nodes,
-		}
-		yamlData, err := yaml.Marshal(output)
-		if err != nil {
-			return fmt.Errorf("failed to marshal YAML: %w", err)
-		}
-		fmt.Println(string(yamlData))
+	// Build result
+	s.result = &ShowResult{
+		Platform: platform,
+		Nodes:    nodes,
+		DNS:      dnsStatus,
+	}
 
-	default: // human-readable sections
-		fmt.Printf("Name:      %s\n", platform.Name)
-		fmt.Printf("Domain:    %s\n", platform.DNS.Domain)
-		fmt.Printf("Provider:  %s\n", platform.Infrastructure.MetalProvider)
-		if platform.Infrastructure.API.URI != "" {
-			fmt.Printf("API:       %s\n", platform.Infrastructure.API.URI)
+	// Human-readable output
+	fmt.Printf("Name:      %s\n", platform.Name)
+	fmt.Printf("Domain:    %s\n", platform.DNS.Domain)
+	fmt.Printf("Provider:  %s\n", platform.Infrastructure.MetalProvider)
+	if platform.Infrastructure.API.URI != "" {
+		fmt.Printf("API:       %s\n", platform.Infrastructure.API.URI)
+	}
+	// DNS Status
+	fmt.Printf("DNS:\n")
+	fmt.Printf("  Provider:   %s\n", platform.DNS.Provider)
+	if dnsConfigured {
+		fmt.Printf("  Status:     configured\n")
+	} else {
+		fmt.Printf("  Status:     not configured\n")
+	}
+	if platform.Networking.PrivateNetwork != "" {
+		fmt.Printf("Network:   %s\n", platform.Networking.PrivateNetwork)
+	}
+	fmt.Printf("Nodes:     %d\n", len(nodes))
+	if len(nodes) > 0 {
+		for _, node := range nodes {
+			fmt.Printf("  - %s\n", node)
 		}
-		if platform.DNS.Provider != "" && platform.DNS.Provider != platform.Infrastructure.MetalProvider {
-			fmt.Printf("DNS:       %s\n", platform.DNS.Provider)
-		}
-		if platform.Networking.PrivateNetwork != "" {
-			fmt.Printf("Network:   %s\n", platform.Networking.PrivateNetwork)
-		}
-		fmt.Printf("Nodes:     %d\n", len(nodes))
-		if len(nodes) > 0 {
-			for _, node := range nodes {
-				fmt.Printf("  - %s\n", node)
-			}
-		}
-		if len(platform.Chassis) > 0 {
-			fmt.Println("Chassis:")
-			for chassis, profiles := range platform.Chassis {
-				for _, profile := range profiles {
-					fmt.Printf("  - %s: %s x%d\n", chassis, profile.Type, profile.Count)
-				}
+	}
+	if len(platform.Chassis) > 0 {
+		fmt.Println("Chassis:")
+		for chassis, profiles := range platform.Chassis {
+			for _, profile := range profiles {
+				fmt.Printf("  - %s: %s x%d\n", chassis, profile.Type, profile.Count)
 			}
 		}
 	}

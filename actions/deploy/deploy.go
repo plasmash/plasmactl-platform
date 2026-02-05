@@ -11,14 +11,22 @@ import (
 	"strings"
 
 	"github.com/launchrctl/keyring"
-	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 	"gopkg.in/yaml.v3"
 )
 
+// DeployResult is the structured output for platform:deploy
+type DeployResult struct {
+	Environment string `json:"environment"`
+	Tags        string `json:"tags"`
+	Success     bool   `json:"success"`
+}
+
 // Deploy implements the platform:deploy command
 type Deploy struct {
-	Log     *launchr.Logger
-	Term    *launchr.Terminal
+	action.WithLogger
+	action.WithTerm
+
 	Keyring keyring.Keyring
 
 	Environment string
@@ -32,16 +40,12 @@ type Deploy struct {
 
 	originalDir  string
 	extractedDir string
+	result       *DeployResult
 }
 
-// SetLogger sets the logger for the action
-func (d *Deploy) SetLogger(log *launchr.Logger) {
-	d.Log = log
-}
-
-// SetTerm sets the terminal for the action
-func (d *Deploy) SetTerm(term *launchr.Terminal) {
-	d.Term = term
+// Result returns the structured result for JSON output
+func (d *Deploy) Result() any {
+	return d.result
 }
 
 // Execute runs the platform:deploy action
@@ -77,11 +81,11 @@ func (d *Deploy) Execute() error {
 
 	// Check if hosts cache exists
 	if !d.cacheExists() {
-		d.Term.Warning().Println("Inventory cache does not exist, skipping deployment")
+		d.Term().Warning().Println("Inventory cache does not exist, skipping deployment")
 		return nil
 	}
 
-	d.Term.Info().Printfln("Deploying %s to %s...", d.Tags, d.Environment)
+	d.Term().Info().Printfln("Deploying %s to %s...", d.Tags, d.Environment)
 
 	// Build ansible-playbook command
 	args := d.buildAnsibleArgs()
@@ -120,7 +124,7 @@ func (d *Deploy) extractImage() error {
 		return fmt.Errorf("failed to create extraction directory: %w", err)
 	}
 
-	d.Term.Info().Printfln("Extracting Platform Image: %s", imgPath)
+	d.Term().Info().Printfln("Extracting Platform Image: %s", imgPath)
 
 	// Open the tar.gz file
 	file, err := os.Open(imgPath)
@@ -173,7 +177,7 @@ func (d *Deploy) extractImage() error {
 		}
 	}
 
-	d.Term.Info().Printfln("Platform Image extracted to %s/", d.extractedDir)
+	d.Term().Info().Printfln("Platform Image extracted to %s/", d.extractedDir)
 	return nil
 }
 
@@ -181,7 +185,7 @@ func (d *Deploy) extractImage() error {
 func (d *Deploy) cleanup() {
 	if d.extractedDir != "" {
 		os.Chdir(d.originalDir)
-		d.Term.Info().Printfln("Cleaning up %s/", d.extractedDir)
+		d.Term().Info().Printfln("Cleaning up %s/", d.extractedDir)
 		os.RemoveAll(d.extractedDir)
 	}
 }
@@ -192,7 +196,7 @@ func (d *Deploy) cacheExists() bool {
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		d.Log.Warn("Failed to read inventory configuration", "path", configPath, "error", err)
+		d.Log().Warn("Failed to read inventory configuration", "path", configPath, "error", err)
 		return false
 	}
 
@@ -203,7 +207,7 @@ func (d *Deploy) cacheExists() bool {
 	}
 
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		d.Log.Warn("Failed to parse inventory configuration", "error", err)
+		d.Log().Warn("Failed to parse inventory configuration", "error", err)
 		return false
 	}
 
@@ -333,7 +337,7 @@ func (d *Deploy) runAnsiblePlaybook(args, env []string, askpassScript string) er
 
 	cmd.Stdin = os.Stdin
 
-	d.Term.Info().Printfln("Running: ansible-playbook %s", strings.Join(args, " "))
+	d.Term().Info().Printfln("Running: ansible-playbook %s", strings.Join(args, " "))
 
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -342,6 +346,13 @@ func (d *Deploy) runAnsiblePlaybook(args, env []string, askpassScript string) er
 		return fmt.Errorf("failed to run ansible-playbook: %w", err)
 	}
 
-	d.Term.Success().Println("Deployment completed successfully")
+	// Build result
+	d.result = &DeployResult{
+		Environment: d.Environment,
+		Tags:        d.Tags,
+		Success:     true,
+	}
+
+	d.Term().Success().Println("Deployment completed successfully")
 	return nil
 }
