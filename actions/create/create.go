@@ -17,6 +17,11 @@ type CreateResult struct {
 	MetalProvider string `json:"metal_provider"`
 	DNSProvider   string `json:"dns_provider"`
 	Domain        string `json:"domain"`
+	Zone          string `json:"zone,omitempty"`
+	Region        string `json:"region,omitempty"`
+	ProjectID     string `json:"project_id,omitempty"`
+	Image         string `json:"image,omitempty"`
+	SSHKeyID      string `json:"ssh_key_id,omitempty"`
 	Path          string `json:"path"`
 }
 
@@ -31,6 +36,11 @@ type Create struct {
 	MetalProvider string
 	DNSProvider   string
 	Domain        string
+	Zone          string
+	Region        string
+	ProjectID     string
+	Image         string
+	SSHKeyID      string
 	SkipDNS       bool
 
 	result *CreateResult
@@ -72,18 +82,52 @@ func (c *Create) Execute() error {
 			URI:   "https://api.online.net/api/v1/",
 			Token: "{{ .keyring.scaleway_api_token }}",
 		}
+		if c.Zone == "" {
+			platform.Infrastructure.Zone = "fr-par-2"
+		}
 	case "hetzner":
 		platform.Infrastructure.API = schema.APIConfig{
 			Token: "{{ .keyring.hetzner_api_token }}",
+		}
+		if c.Zone == "" {
+			platform.Infrastructure.Zone = "fsn1"
+		}
+		if c.Image == "" {
+			platform.Infrastructure.Image = "ubuntu-24.04"
 		}
 	case "ovh":
 		platform.Infrastructure.API = schema.APIConfig{
 			Token: "{{ .keyring.ovh_api_token }}",
 		}
-	case "aws", "gcp", "azure":
+	case "aws":
+		// AWS uses environment variables or SDK defaults for credentials
+		if c.Region == "" {
+			platform.Infrastructure.Region = "eu-west-1"
+		}
+		if c.Zone == "" {
+			platform.Infrastructure.Zone = "eu-west-1a"
+		}
+	case "gcp", "azure":
 		// Cloud providers use environment variables or SDK defaults
 	case "manual":
-		// No API configuration needed
+		// No API or infrastructure configuration needed
+	}
+
+	// User-provided values override defaults
+	if c.Zone != "" {
+		platform.Infrastructure.Zone = c.Zone
+	}
+	if c.Region != "" {
+		platform.Infrastructure.Region = c.Region
+	}
+	if c.ProjectID != "" {
+		platform.Infrastructure.ProjectID = c.ProjectID
+	}
+	if c.Image != "" {
+		platform.Infrastructure.Image = c.Image
+	}
+	if c.SSHKeyID != "" {
+		platform.Infrastructure.SSHKeyID = c.SSHKeyID
 	}
 
 	data, err := yaml.Marshal(platform)
@@ -107,6 +151,11 @@ func (c *Create) Execute() error {
 		MetalProvider: c.MetalProvider,
 		DNSProvider:   c.DNSProvider,
 		Domain:        c.Domain,
+		Zone:          platform.Infrastructure.Zone,
+		Region:        platform.Infrastructure.Region,
+		ProjectID:     platform.Infrastructure.ProjectID,
+		Image:         platform.Infrastructure.Image,
+		SSHKeyID:      platform.Infrastructure.SSHKeyID,
 		Path:          instDir,
 	}
 

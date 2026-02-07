@@ -1,0 +1,114 @@
+action:
+  title: Graph
+  description: Query the platform dependency graph
+  arguments:
+    - name: query
+      title: Query
+      description: Node to query (component, chassis, variable, node). Empty for full graph.
+      type: string
+      default: ""
+  options:
+    - name: reverse
+      title: Reverse
+      description: Show reverse dependencies (what depends on this node)
+      type: boolean
+      default: false
+    - name: depth
+      title: Depth
+      description: Maximum depth to traverse (-1 for unlimited)
+      type: integer
+      default: -1
+    - name: tree
+      title: Tree
+      shorthand: t
+      description: Show as tree (shorthand for --format=tree)
+      type: boolean
+      default: false
+    - name: format
+      title: Format
+      shorthand: f
+      description: "Output format: auto (tree), tree, json, graphml, mermaid"
+      type: string
+      default: "auto"
+    - name: compose-dir
+      title: Compose Directory
+      description: Directory containing composed model
+      type: string
+      default: ".plasma/model/compose/merged"
+    - name: debug
+      title: Debug
+      description: Show timing debug information
+      type: boolean
+      default: false
+
+  result:
+    type: object
+    description: Platform dependency graph query result
+    properties:
+      query:
+        type: object
+        description: Query parameters used
+        properties:
+          node:
+            type: string
+            description: Queried node (empty for full graph)
+          reverse:
+            type: boolean
+            description: Whether reverse dependencies were queried
+          depth:
+            type: integer
+            description: Maximum traversal depth (-1 for unlimited)
+      nodes:
+        type: array
+        description: List of nodes in the result graph
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Node identifier
+            type:
+              type: string
+              description: Node type (component, chassis, variable, node)
+            kind:
+              type: string
+              description: Component kind if applicable
+            layer:
+              type: string
+              description: Platform layer if applicable
+      edges:
+        type: array
+        description: List of edges in the result graph
+        items:
+          type: object
+          properties:
+            source:
+              type: string
+              description: Source node identifier
+            target:
+              type: string
+              description: Target node identifier
+            type:
+              type: string
+              description: Edge type (executes, materializes, composes, etc.)
+      stats:
+        type: object
+        description: Graph statistics
+        properties:
+          total_nodes:
+            type: integer
+            description: Total number of nodes
+          total_edges:
+            type: integer
+            description: Total number of edges
+    required:
+      - query
+      - nodes
+      - edges
+      - stats
+
+runtime:
+  type: shell
+  script: |
+    chmod +x $$ACTION_DIR/graph
+    $$ACTION_DIR/graph "{{ .query }}" --reverse={{ .reverse }} --depth={{ .depth }} --tree={{ .tree }} --format={{ .format }} --compose-dir={{ .compose_dir }} --debug={{ .debug }}

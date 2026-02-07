@@ -1,0 +1,22 @@
+runtime: plugin
+action:
+  title: Check Platform
+  description: "Run comprehensive graph-powered validations across all platform aspects: components, model, chassis, nodes, variables, and flows"
+  options:
+    - name: section
+      title: Section
+      description: "Run only a specific validation section (components, model, chassis, nodes, variables, flows)"
+      type: string
+      default: ""
+  result:
+    type: object
+    properties:
+      sections:
+        type: array
+        description: Validation results per section
+      total_errors:
+        type: integer
+        description: Total number of errors found
+      total_warnings:
+        type: integer
+        description: Total number of warnings found

@@ -25,6 +25,31 @@ action:
       description: Domain name for the platform
       type: string
       required: true
+    - name: zone
+      title: Zone
+      description: Infrastructure zone (e.g., fr-par-2 for Scaleway, fsn1 for Hetzner, eu-west-1a for AWS)
+      type: string
+      default: ""
+    - name: region
+      title: Region
+      description: Infrastructure region (e.g., eu-west-1 for AWS)
+      type: string
+      default: ""
+    - name: project-id
+      title: Project ID
+      description: Provider project ID (e.g., Scaleway project ID)
+      type: string
+      default: ""
+    - name: image
+      title: Image
+      description: Server image (e.g., ubuntu-24.04 for Hetzner, ami-xxx for AWS)
+      type: string
+      default: ""
+    - name: ssh-key-id
+      title: SSH Key ID
+      description: SSH key identifier for the provider
+      type: string
+      default: ""
     - name: skip-dns
       title: Skip DNS
       description: Skip DNS configuration (MX, DKIM, DMARC, SPF)

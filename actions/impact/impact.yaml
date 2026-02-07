@@ -1,0 +1,27 @@
+runtime: plugin
+action:
+  title: Impact Analysis
+  description: "Analyze the blast radius of changing or removing any graph node: component, variable, chassis path, node, package, or flow"
+  arguments:
+    - name: name
+      title: Name
+      description: "The name of the entity to analyze (component, variable, chassis path, node hostname, package, or flow)"
+      required: true
+  result:
+    type: object
+    properties:
+      name:
+        type: string
+        description: Name of the analyzed entity
+      node_type:
+        type: string
+        description: "Graph node type (component, variable, chassis, node, package)"
+      node_kind:
+        type: string
+        description: "Specific kind (application, service, etc.)"
+      direct:
+        type: array
+        description: Direct impact entries
+      transitive:
+        type: array
+        description: Transitive impact entries

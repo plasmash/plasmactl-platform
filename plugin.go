@@ -4,21 +4,26 @@ package platform
 import (
 	"context"
 	"embed"
+	"os"
+	"path/filepath"
 
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/action"
 
+	"github.com/plasmash/plasmactl-platform/actions/check"
 	"github.com/plasmash/plasmactl-platform/actions/create"
 	"github.com/plasmash/plasmactl-platform/actions/deploy"
 	"github.com/plasmash/plasmactl-platform/actions/destroy"
+	"github.com/plasmash/plasmactl-platform/actions/impact"
 	"github.com/plasmash/plasmactl-platform/actions/list"
 	"github.com/plasmash/plasmactl-platform/actions/show"
 	"github.com/plasmash/plasmactl-platform/actions/up"
 	"github.com/plasmash/plasmactl-platform/actions/validate"
+	pkggraph "github.com/plasmash/plasmactl-platform/pkg/graph"
 )
 
-//go:embed actions/*/*.yaml
+//go:embed actions/*/*.yaml actions/graph/*
 var actionYamlFS embed.FS
 
 func init() {
@@ -44,6 +49,32 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 	app.GetService(&p.k)
 	app.GetService(&p.m)
 	p.app = app
+
+	// Extract the graph binary from embedded FS early so it's available
+	// to all plugins (not just platform:* actions). DiscoverActions uses
+	// lazy evaluation and may not run for non-platform commands.
+	if err := p.initGraphBinary(); err != nil {
+		launchr.Log().Warn("failed to extract graph binary", "err", err)
+	}
+	return nil
+}
+
+// initGraphBinary extracts the embedded Rust graph binary to a temp directory
+// and registers it with the graph package so any plugin can call graph.Load().
+func (p *Plugin) initGraphBinary() error {
+	data, err := actionYamlFS.ReadFile("actions/graph/graph")
+	if err != nil {
+		return err
+	}
+	dir, err := os.MkdirTemp("", "plasmactl-graph-*")
+	if err != nil {
+		return err
+	}
+	binPath := filepath.Join(dir, "graph")
+	if err = os.WriteFile(binPath, data, 0o755); err != nil {
+		return err
+	}
+	pkggraph.SetBinaryPath(binPath)
 	return nil
 }
 
@@ -93,6 +124,11 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 			MetalProvider: input.Opt("metal-provider").(string),
 			DNSProvider:   input.Opt("dns-provider").(string),
 			Domain:        input.Opt("domain").(string),
+			Zone:          input.Opt("zone").(string),
+			Region:        input.Opt("region").(string),
+			ProjectID:     input.Opt("project-id").(string),
+			Image:         input.Opt("image").(string),
+			SSHKeyID:      input.Opt("ssh-key-id").(string),
 			SkipDNS:       input.Opt("skip-dns").(bool),
 		}
 		c.SetLogger(log)
@@ -190,9 +226,48 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	}))
 	actions = append(actions, deployAction)
 
+	// platform:check action
+	checkYaml, _ := actionYamlFS.ReadFile("actions/check/check.yaml")
+	checkAction := action.NewFromYAML("platform:check", checkYaml)
+	checkAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
+		input := a.Input()
+		log, term := getLoggerTerm(a)
+		ch := &check.Check{
+			Section: input.Opt("section").(string),
+		}
+		ch.SetLogger(log)
+		ch.SetTerm(term)
+		err := ch.Execute()
+		return ch.Result(), err
+	}))
+	actions = append(actions, checkAction)
+
+	// platform:impact action
+	impactYaml, _ := actionYamlFS.ReadFile("actions/impact/impact.yaml")
+	impactAction := action.NewFromYAML("platform:impact", impactYaml)
+	impactAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
+		input := a.Input()
+		log, term := getLoggerTerm(a)
+		imp := &impact.Impact{
+			Name: input.Arg("name").(string),
+		}
+		imp.SetLogger(log)
+		imp.SetTerm(term)
+		err := imp.Execute()
+		return imp.Result(), err
+	}))
+	actions = append(actions, impactAction)
+
 	// Note: platform:prepare is NOT embedded here.
 	// It must be provided by plasmactl-model plugin.
 	// platform:up validates its existence at runtime.
+
+	// platform:graph action (container-based)
+	graphAction, err := action.NewYAMLFromFS("platform:graph", launchr.MustSubFS(actionYamlFS, "actions/graph"))
+	if err != nil {
+		return nil, err
+	}
+	actions = append(actions, graphAction)
 
 	return actions, nil
 }

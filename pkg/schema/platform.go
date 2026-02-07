@@ -22,6 +22,11 @@ type Platform struct {
 type Infrastructure struct {
 	MetalProvider string    `yaml:"metal_provider"` // scaleway, hetzner, aws, ovh, gcp, azure, manual
 	API           APIConfig `yaml:"api,omitempty"`
+	Zone          string    `yaml:"zone,omitempty"`
+	Region        string    `yaml:"region,omitempty"`
+	ProjectID     string    `yaml:"project_id,omitempty"`
+	Image         string    `yaml:"image,omitempty"`
+	SSHKeyID      string    `yaml:"ssh_key_id,omitempty"`
 }
 
 // DNSConfig defines DNS provider configuration

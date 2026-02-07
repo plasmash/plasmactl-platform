@@ -82,6 +82,8 @@ define print_step
 	@echo "$(BOLD)$(MAGENTA)🔧 $(1)$(RESET)"
 endef
 
+RUST_TARGET := x86_64-unknown-linux-gnu
+
 .PHONY: all
 all: banner deps test-short build
 	$(call print_success,"🎉 All tasks completed successfully!")
@@ -175,6 +177,14 @@ endif
 	echo "$(BOLD)$(GREEN)🔍 ✅ All linting checks passed$(RESET)" || \
 	echo "$(BOLD)$(YELLOW)🔍 ⚠️ Some linting issues found - please review$(RESET)"
 	@echo
+
+# Build platform-graph Rust binary
+.PHONY: graph
+graph:
+	$(call print_step,"Building platform-graph Rust binary...")
+	@cargo build --release --target $(RUST_TARGET) --manifest-path actions/graph/rust/Cargo.toml
+	@cp actions/graph/rust/target/$(RUST_TARGET)/release/platform-graph actions/graph/graph
+	$(call print_success,"platform-graph binary built!")
 
 # Clean build artifacts
 .PHONY: clean
