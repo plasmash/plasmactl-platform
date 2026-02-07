@@ -99,6 +99,15 @@ func (c *Create) Execute() error {
 		platform.Infrastructure.API = schema.APIConfig{
 			Token: "{{ .keyring.ovh_api_token }}",
 		}
+		if c.Region == "" {
+			platform.Infrastructure.Region = "eu"
+		}
+		if c.Zone == "" {
+			platform.Infrastructure.Zone = "rbx"
+		}
+		if c.Image == "" {
+			platform.Infrastructure.Image = "debian12_64"
+		}
 	case "aws":
 		// AWS uses environment variables or SDK defaults for credentials
 		if c.Region == "" {
