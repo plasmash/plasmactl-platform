@@ -8,6 +8,5 @@
 *.gen.go
 dist/
 vendor/
-actions/graph/platform-graph-*
 actions/graph/graph
 actions/graph/rust/target/
