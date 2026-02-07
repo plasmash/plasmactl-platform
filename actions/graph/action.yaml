@@ -107,8 +107,4 @@ action:
       - edges
       - stats
 
-runtime:
-  type: shell
-  script: |
-    chmod +x $$ACTION_DIR/graph
-    $$ACTION_DIR/graph "{{ .query }}" --reverse={{ .reverse }} --depth={{ .depth }} --tree={{ .tree }} --format={{ .format }} --compose-dir={{ .compose_dir }} --debug={{ .debug }}
+runtime: plugin

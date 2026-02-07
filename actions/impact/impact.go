@@ -72,8 +72,6 @@ func (imp *Impact) Execute() error {
 		imp.analyzeGeneric(g, node)
 	}
 
-	imp.printText()
-
 	return nil
 }
 
@@ -425,7 +423,7 @@ func (imp *Impact) analyzeGeneric(g *graph.PlatformGraph, node *graph.PlatformNo
 	})
 }
 
-func (imp *Impact) printText() {
+func (imp *Impact) PrintText() {
 	r := imp.result
 
 	imp.Term().Info().Printfln("Impact analysis for %s (%s/%s)", r.Name, r.NodeType, r.NodeKind)

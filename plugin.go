@@ -4,8 +4,12 @@ package platform
 import (
 	"context"
 	"embed"
+	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
@@ -23,7 +27,7 @@ import (
 	pkggraph "github.com/plasmash/plasmactl-platform/pkg/graph"
 )
 
-//go:embed actions/*/*.yaml actions/graph/*
+//go:embed actions/*/*.yaml
 var actionYamlFS embed.FS
 
 func init() {
@@ -62,16 +66,19 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 // initGraphBinary extracts the embedded Rust graph binary to a temp directory
 // and registers it with the graph package so any plugin can call graph.Load().
 func (p *Plugin) initGraphBinary() error {
-	data, err := actionYamlFS.ReadFile("actions/graph/graph")
-	if err != nil {
-		return err
+	if len(graphBinaryData) == 0 {
+		return fmt.Errorf("no graph binary embedded for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	dir, err := os.MkdirTemp("", "plasmactl-graph-*")
 	if err != nil {
 		return err
 	}
-	binPath := filepath.Join(dir, "graph")
-	if err = os.WriteFile(binPath, data, 0o755); err != nil {
+	name := "graph"
+	if runtime.GOOS == "windows" {
+		name = "graph.exe"
+	}
+	binPath := filepath.Join(dir, name)
+	if err = os.WriteFile(binPath, graphBinaryData, 0o755); err != nil {
 		return err
 	}
 	pkggraph.SetBinaryPath(binPath)
@@ -238,7 +245,14 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		ch.SetLogger(log)
 		ch.SetTerm(term)
 		err := ch.Execute()
-		return ch.Result(), err
+		// Structured (--json): return result only (total_errors is in the result).
+		// Otherwise: print and return error.
+		jsonOutput, _ := input.GetFlagInGroup(p.m.GetPersistentFlags().Name(), "json").(bool)
+		if jsonOutput {
+			return ch.Result(), nil
+		}
+		ch.PrintText()
+		return nil, err
 	}))
 	actions = append(actions, checkAction)
 
@@ -254,7 +268,13 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		imp.SetLogger(log)
 		imp.SetTerm(term)
 		err := imp.Execute()
-		return imp.Result(), err
+		// Structured (--json): return result only. Otherwise: print and return nil.
+		jsonOutput, _ := input.GetFlagInGroup(p.m.GetPersistentFlags().Name(), "json").(bool)
+		if jsonOutput {
+			return imp.Result(), err
+		}
+		imp.PrintText()
+		return nil, err
 	}))
 	actions = append(actions, impactAction)
 
@@ -262,11 +282,62 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	// It must be provided by plasmactl-model plugin.
 	// platform:up validates its existence at runtime.
 
-	// platform:graph action (container-based)
-	graphAction, err := action.NewYAMLFromFS("platform:graph", launchr.MustSubFS(actionYamlFS, "actions/graph"))
-	if err != nil {
-		return nil, err
-	}
+	// platform:graph action
+	graphYaml, _ := actionYamlFS.ReadFile("actions/graph/action.yaml")
+	graphAction := action.NewFromYAML("platform:graph", graphYaml)
+	graphAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
+		input := a.Input()
+		query := input.Arg("query").(string)
+		reverse := input.Opt("reverse").(bool)
+		depth := input.Opt("depth").(int)
+		tree := input.Opt("tree").(bool)
+		format := input.Opt("format").(string)
+		composeDir := input.Opt("compose-dir").(string)
+		debug := input.Opt("debug").(bool)
+
+		// Detect framework --json flag for structured output
+		jsonOutput, _ := input.GetFlagInGroup(p.m.GetPersistentFlags().Name(), "json").(bool)
+		if jsonOutput {
+			format = "json"
+		}
+
+		args := []string{query,
+			fmt.Sprintf("--reverse=%t", reverse),
+			fmt.Sprintf("--depth=%d", depth),
+			fmt.Sprintf("--tree=%t", tree),
+			fmt.Sprintf("--format=%s", format),
+			fmt.Sprintf("--compose-dir=%s", composeDir),
+			fmt.Sprintf("--debug=%t", debug),
+		}
+
+		binPath := pkggraph.BinaryPath()
+		if binPath == "" {
+			return nil, fmt.Errorf("graph binary not available")
+		}
+
+		cmd := exec.Command(binPath, args...)
+		cmd.Stderr = a.Input().Streams().Err()
+
+		if jsonOutput {
+			// Capture output and return structured result for --json/web
+			out, err := cmd.Output()
+			if err != nil {
+				return nil, fmt.Errorf("graph binary failed: %w", err)
+			}
+			var result any
+			if err = json.Unmarshal(out, &result); err != nil {
+				return nil, fmt.Errorf("failed to parse graph output: %w", err)
+			}
+			return result, nil
+		}
+
+		// Pipe directly to stdout for CLI display, return nil (outputText skips nil)
+		cmd.Stdout = a.Input().Streams().Out()
+		if err := cmd.Run(); err != nil {
+			return nil, fmt.Errorf("graph binary failed: %w", err)
+		}
+		return nil, nil
+	}))
 	actions = append(actions, graphAction)
 
 	return actions, nil

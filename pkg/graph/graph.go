@@ -56,6 +56,9 @@ var binaryPath string
 // SetBinaryPath is called by the platform plugin during OnAppInit.
 func SetBinaryPath(p string) { binaryPath = p }
 
+// BinaryPath returns the registered graph binary path.
+func BinaryPath() string { return binaryPath }
+
 // Load executes the graph binary and builds the gonum graph.
 // The binary uses its default --compose-dir (.plasma/model/compose/merged)
 // relative to the current working directory.

@@ -14,6 +14,27 @@ action:
       sections:
         type: array
         description: Validation results per section
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Section identifier for layout switching (components, model, chassis, nodes, variables, flows)
+            name:
+              type: string
+              description: Human-readable section name
+            passed:
+              type: integer
+              description: Number of checks passed
+            errors:
+              type: integer
+              description: Number of errors found
+            warnings:
+              type: integer
+              description: Number of warnings found
+            findings:
+              type: array
+              description: List of findings
       total_errors:
         type: integer
         description: Total number of errors found

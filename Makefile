@@ -82,7 +82,10 @@ define print_step
 	@echo "$(BOLD)$(MAGENTA)🔧 $(1)$(RESET)"
 endef
 
-RUST_TARGET := x86_64-unknown-linux-gnu
+# Graph build container (no Rust toolchain needed on host).
+GRAPH_DOCKER_IMAGE := plasmactl-graph-builder
+GRAPH_RUST_DIR     := actions/graph/rust
+GRAPH_OUTPUT_DIR   := actions/graph
 
 .PHONY: all
 all: banner deps test-short build
@@ -178,13 +181,30 @@ endif
 	echo "$(BOLD)$(YELLOW)🔍 ⚠️ Some linting issues found - please review$(RESET)"
 	@echo
 
-# Build platform-graph Rust binary
+# Build graph binary for current platform only (requires Rust on host)
 .PHONY: graph
 graph:
-	$(call print_step,"Building platform-graph Rust binary...")
-	@cargo build --release --target $(RUST_TARGET) --manifest-path actions/graph/rust/Cargo.toml
-	@cp actions/graph/rust/target/$(RUST_TARGET)/release/platform-graph actions/graph/graph
-	$(call print_success,"platform-graph binary built!")
+	$(call print_step,"Building platform-graph for current platform...")
+	@cargo build --release --manifest-path $(GRAPH_RUST_DIR)/Cargo.toml
+	@cp $(GRAPH_RUST_DIR)/target/release/platform-graph $(GRAPH_OUTPUT_DIR)/platform-graph-$(shell go env GOOS)-$(shell go env GOARCH)
+	$(call print_success,"platform-graph binary built for current platform!")
+
+# Build graph binaries for all platforms via Docker (no Rust needed on host)
+.PHONY: graph-all
+graph-all:
+	$(call print_step,"Building platform-graph for all platforms via Docker...")
+	@docker build -t $(GRAPH_DOCKER_IMAGE) -f $(GRAPH_RUST_DIR)/Dockerfile $(GRAPH_RUST_DIR)
+	@cid=$$(docker create $(GRAPH_DOCKER_IMAGE)) && \
+		for f in \
+			platform-graph-linux-amd64 \
+			platform-graph-linux-arm64 \
+			platform-graph-darwin-amd64 \
+			platform-graph-darwin-arm64 \
+			platform-graph-windows-amd64.exe; do \
+			docker cp "$$cid:/$$f" "$(GRAPH_OUTPUT_DIR)/$$f"; \
+		done && \
+		docker rm "$$cid" > /dev/null
+	$(call print_success,"All platform-graph binaries built!")
 
 # Clean build artifacts
 .PHONY: clean
@@ -206,6 +226,8 @@ help:
 	@echo "  $(BOLD)$(GREEN)build$(RESET)       🔨 Build launchr binary"
 	@echo "  $(BOLD)$(GREEN)install$(RESET)     🚀 Install launchr to GOPATH"
 	@echo "  $(BOLD)$(GREEN)lint$(RESET)        🔍 Run linters with auto-fix"
+	@echo "  $(BOLD)$(GREEN)graph$(RESET)       🦀 Build graph binary for current platform (needs Rust)"
+	@echo "  $(BOLD)$(GREEN)graph-all$(RESET)   🐳 Build graph binaries for all platforms (needs Docker)"
 	@echo "  $(BOLD)$(GREEN)clean$(RESET)       🧹 Clean build artifacts"
 	@echo "  $(BOLD)$(GREEN)help$(RESET)        ❓ Show this help message"
 	@echo ""
