@@ -962,18 +962,29 @@ impl GraphBuilder {
             }
         }
 
-        // Match triggers to outputs: if flow B's trigger matches flow A's output, A choreographs B
+        // Match triggers to outputs: if flow B's trigger matches flow A's output, A choreographs B.
+        // Also check .event suffix: trigger "x.event" matches output "x" (Go flow-viz compat).
         let mut n_edges = 0usize;
         for fp in flow_pending {
             if fp.trigger.is_empty() || fp.trigger == "None" {
                 continue;
             }
             let normalized_trigger = normalize_flow_channel(&fp.trigger);
-            if let Some(producers) = output_to_flows.get(&normalized_trigger) {
-                for producer in producers {
-                    if producer != &fp.component {
-                        self.graph.add_edge(producer, &fp.component, "choreographs");
-                        n_edges += 1;
+            // Try direct match, then strip .event suffix from trigger
+            let candidates = [
+                normalized_trigger.clone(),
+                normalized_trigger.strip_suffix(".event").unwrap_or("").to_string(),
+            ];
+            for candidate in &candidates {
+                if candidate.is_empty() {
+                    continue;
+                }
+                if let Some(producers) = output_to_flows.get(candidate) {
+                    for producer in producers {
+                        if producer != &fp.component {
+                            self.graph.add_edge(producer, &fp.component, "choreographs");
+                            n_edges += 1;
+                        }
                     }
                 }
             }

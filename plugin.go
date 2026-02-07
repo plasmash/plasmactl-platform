@@ -63,14 +63,19 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 	return nil
 }
 
-// initGraphBinary extracts the embedded Rust graph binary to a temp directory
+// initGraphBinary extracts the embedded Rust graph binary to a cache directory
 // and registers it with the graph package so any plugin can call graph.Load().
+// Uses a fixed path to avoid accumulating temp directories across runs.
 func (p *Plugin) initGraphBinary() error {
 	if len(graphBinaryData) == 0 {
 		return fmt.Errorf("no graph binary embedded for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
-	dir, err := os.MkdirTemp("", "plasmactl-graph-*")
+	cacheDir, err := os.UserCacheDir()
 	if err != nil {
+		cacheDir = os.TempDir()
+	}
+	dir := filepath.Join(cacheDir, "plasmactl", "graph")
+	if err = os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	name := "graph"

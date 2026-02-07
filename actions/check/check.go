@@ -544,38 +544,49 @@ func (c *Check) checkFlows(g *graph.PlatformGraph) SectionResult {
 		return sr
 	}
 
-	// Separate flows from executors: executors group flows, flows orchestrate skills.
-	var flowAgents []*graph.PlatformNode
+	// Classify agents by behavior:
+	// - "skill agents" (flows/agents): orchestrate skills
+	// - "executors": depend on other agents (group flows)
+	// This works regardless of naming convention (executor→flow→skill or agent→skill).
+	skillAgentSet := make(map[string]bool)
+	executorSet := make(map[string]bool)
 	for _, a := range agents {
-		if !strings.Contains(a.Name, ".executors.") {
-			flowAgents = append(flowAgents, a)
-		}
-	}
-
-	// 1. Flows without skills: flows that don't orchestrate any skill
-	var flowsNoSkill []string
-	for _, f := range flowAgents {
-		edges := g.EdgesFrom(f.Name, "orchestrates")
-		hasSkill := false
-		for _, e := range edges {
+		for _, e := range g.EdgesFrom(a.Name, "orchestrates") {
 			if e.To().Kind == "skill" {
-				hasSkill = true
+				skillAgentSet[a.Name] = true
 				break
 			}
 		}
-		if !hasSkill {
-			flowsNoSkill = append(flowsNoSkill, f.Name)
+	}
+	for _, a := range agents {
+		if skillAgentSet[a.Name] {
+			continue
+		}
+		// Executors depend on or orchestrate other agents
+		for _, e := range g.EdgesFrom(a.Name, "depends", "orchestrates") {
+			if e.To().Kind == "agent" {
+				executorSet[a.Name] = true
+				break
+			}
 		}
 	}
-	sort.Strings(flowsNoSkill)
-	if len(flowsNoSkill) == 0 {
+
+	// 1. Agents that are neither skill-agents nor executors
+	var agentsUnlinked []string
+	for _, a := range agents {
+		if !skillAgentSet[a.Name] && !executorSet[a.Name] {
+			agentsUnlinked = append(agentsUnlinked, a.Name)
+		}
+	}
+	sort.Strings(agentsUnlinked)
+	if len(agentsUnlinked) == 0 {
 		sr.Passed++
 	} else {
 		sr.Findings = append(sr.Findings, Finding{
 			Section:  "flows",
 			Severity: "warning",
-			Message:  fmt.Sprintf("%d flow(s) without skills", len(flowsNoSkill)),
-			Details:  flowsNoSkill,
+			Message:  fmt.Sprintf("%d agent(s) without skills or executor role", len(agentsUnlinked)),
+			Details:  agentsUnlinked,
 		})
 		sr.Warnings++
 	}

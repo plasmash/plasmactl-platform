@@ -20,7 +20,7 @@ pub struct Node {
 pub struct PlatformGraph {
     pub graph: DiGraph<Node, String>,
     node_indices: HashMap<String, NodeIndex>,
-    edge_set: HashSet<(NodeIndex, NodeIndex)>,
+    edge_set: HashSet<(NodeIndex, NodeIndex, String)>,
 }
 
 impl PlatformGraph {
@@ -55,7 +55,7 @@ impl PlatformGraph {
     pub fn add_edge(&mut self, source: &str, target: &str, edge_type: &str) {
         let source_idx = self.ensure_node(source);
         let target_idx = self.ensure_node(target);
-        let key = (source_idx, target_idx);
+        let key = (source_idx, target_idx, edge_type.to_string());
         if self.edge_set.insert(key) {
             self.graph.add_edge(source_idx, target_idx, edge_type.to_string());
         }
