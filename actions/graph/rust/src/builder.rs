@@ -325,7 +325,7 @@ impl GraphBuilder {
                         }
 
                         // Extract flow_trigger/flow_output from flow_builder tasks
-                        if kind == "flow"
+                        if kind_plural_or_dir == "flows"
                             && filename == "main.yaml"
                             && memchr::memmem::find(&content, b"flow_builder").is_some()
                         {
