@@ -52,6 +52,7 @@ pub struct GraphBuilder {
     compose_dir: PathBuf,
     pub graph: PlatformGraph,
     known_variables: HashSet<String>,
+    platform_names: Vec<String>,
 }
 
 impl GraphBuilder {
@@ -60,6 +61,7 @@ impl GraphBuilder {
             compose_dir: compose_dir.to_path_buf(),
             graph: PlatformGraph::new(),
             known_variables: HashSet::new(),
+            platform_names: Vec::new(),
         }
     }
 
@@ -67,6 +69,12 @@ impl GraphBuilder {
         let total_start = Instant::now();
 
         // 1. Discover structure
+        let t = Instant::now();
+        self.discover_platforms();
+        if debug {
+            eprintln!("  discover_platforms: {:.3}s ({} found)", t.elapsed().as_secs_f64(), self.platform_names.len());
+        }
+
         let t = Instant::now();
         self.discover_chassis();
         if debug {
@@ -497,6 +505,57 @@ impl GraphBuilder {
         self.graph
     }
 
+    /// Resolve the repository root from compose_dir (.plasma/model/compose/merged → repo root).
+    fn repo_root(&self) -> PathBuf {
+        // compose_dir is .plasma/model/compose/merged, repo root is 4 levels up
+        self.compose_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| self.compose_dir.clone())
+    }
+
+    /// Discover all platform instances from inst/*/platform.yaml.
+    fn discover_platforms(&mut self) {
+        let inst_dir = self.compose_dir.join("inst");
+        if let Ok(entries) = fs::read_dir(&inst_dir) {
+            for entry in entries.flatten() {
+                if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    continue;
+                }
+                let pf = entry.path().join("platform.yaml");
+                if let Ok(content) = fs::read_to_string(&pf) {
+                    if let Ok(data) = serde_yaml::from_str::<serde_yaml::Value>(&content) {
+                        if let Some(name) = data.get("name").and_then(|v| v.as_str()) {
+                            self.platform_names.push(name.to_string());
+                            self.graph.add_node(Node {
+                                name: name.to_string(),
+                                kind: "platform".to_string(),
+                                versioned: false,
+                                version: None,
+                                path: Some(pf.to_string_lossy().to_string()),
+                                attrs: HashMap::new(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        if self.platform_names.is_empty() {
+            self.platform_names.push("platform".to_string());
+            self.graph.add_node(Node {
+                name: "platform".to_string(),
+                kind: "platform".to_string(),
+                versioned: false,
+                version: None,
+                path: None,
+                attrs: HashMap::new(),
+            });
+        }
+    }
+
     fn discover_chassis(&mut self) {
         let chassis_file = self.compose_dir.join("chassis.yaml");
         let content = match fs::read_to_string(&chassis_file) {
@@ -511,26 +570,44 @@ impl GraphBuilder {
             }
         };
 
-        self.graph.add_node(Node {
-            name: "platform".to_string(),
-            kind: "platform".to_string(),
-            versioned: false,
-            version: None,
-            path: None,
-            attrs: HashMap::new(),
-        });
-        self.add_chassis_hierarchy(&data, "platform");
+        // chassis.yaml has a top-level "platform" key containing the chassis tree.
+        // Extract it and build the tree, connecting platform instances to top-level chassis.
+        if let Some(platform_data) = data.get("platform") {
+            self.build_top_chassis(platform_data, "platform");
+        }
     }
 
-    fn add_chassis_hierarchy(&mut self, data: &serde_yaml::Value, parent: &str) {
+    /// Build top-level chassis nodes and connect each platform instance to them.
+    /// Deeper levels use add_chassis_hierarchy (no platform edges needed).
+    fn build_top_chassis(&mut self, data: &serde_yaml::Value, prefix: &str) {
+        let platform_names = self.platform_names.clone();
         match data {
             serde_yaml::Value::Mapping(map) => {
                 for (key, value) in map {
                     if let Some(key_str) = key.as_str() {
-                        if key_str == "platform" {
-                            self.add_chassis_hierarchy(value, "platform");
-                        } else {
-                            let chassis_name = format!("{}.{}", parent, key_str);
+                        let chassis_name = format!("{}.{}", prefix, key_str);
+                        self.graph.add_node(Node {
+                            name: chassis_name.clone(),
+                            kind: "chassis".to_string(),
+                            versioned: false,
+                            version: None,
+                            path: None,
+                            attrs: HashMap::new(),
+                        });
+                        for pname in &platform_names {
+                            self.graph.add_edge(pname, &chassis_name, "contains");
+                        }
+                        if !value.is_null() {
+                            self.add_chassis_hierarchy(value, &chassis_name);
+                        }
+                    }
+                }
+            }
+            serde_yaml::Value::Sequence(seq) => {
+                for item in seq {
+                    match item {
+                        serde_yaml::Value::String(s) => {
+                            let chassis_name = format!("{}.{}", prefix, s);
                             self.graph.add_node(Node {
                                 name: chassis_name.clone(),
                                 kind: "chassis".to_string(),
@@ -539,10 +616,38 @@ impl GraphBuilder {
                                 path: None,
                                 attrs: HashMap::new(),
                             });
-                            self.graph.add_edge(parent, &chassis_name, "contains");
-                            if !value.is_null() {
-                                self.add_chassis_hierarchy(value, &chassis_name);
+                            for pname in &platform_names {
+                                self.graph.add_edge(pname, &chassis_name, "contains");
                             }
+                        }
+                        serde_yaml::Value::Mapping(_) => {
+                            self.build_top_chassis(item, prefix);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn add_chassis_hierarchy(&mut self, data: &serde_yaml::Value, parent: &str) {
+        match data {
+            serde_yaml::Value::Mapping(map) => {
+                for (key, value) in map {
+                    if let Some(key_str) = key.as_str() {
+                        let chassis_name = format!("{}.{}", parent, key_str);
+                        self.graph.add_node(Node {
+                            name: chassis_name.clone(),
+                            kind: "chassis".to_string(),
+                            versioned: false,
+                            version: None,
+                            path: None,
+                            attrs: HashMap::new(),
+                        });
+                        self.graph.add_edge(parent, &chassis_name, "contains");
+                        if !value.is_null() {
+                            self.add_chassis_hierarchy(value, &chassis_name);
                         }
                     }
                 }
@@ -586,6 +691,15 @@ impl GraphBuilder {
             if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                 continue;
             }
+            // Read platform name for this instance
+            let platform_name = {
+                let pf = entry.path().join("platform.yaml");
+                fs::read_to_string(&pf).ok().and_then(|content| {
+                    serde_yaml::from_str::<serde_yaml::Value>(&content).ok().and_then(|data| {
+                        data.get("name").and_then(|v| v.as_str()).map(|s| s.to_string())
+                    })
+                })
+            };
             let nodes_dir = entry.path().join("nodes");
             if !nodes_dir.exists() {
                 continue;
@@ -599,12 +713,12 @@ impl GraphBuilder {
                 if path.extension().and_then(|e| e.to_str()) != Some("yaml") {
                     continue;
                 }
-                self.add_node_from_yaml(&path);
+                self.add_node_from_yaml(&path, platform_name.as_deref());
             }
         }
     }
 
-    fn add_node_from_yaml(&mut self, path: &Path) {
+    fn add_node_from_yaml(&mut self, path: &Path, platform_name: Option<&str>) {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(_) => return,
@@ -653,6 +767,11 @@ impl GraphBuilder {
                 attrs: HashMap::new(),
             });
             self.graph.add_edge(&hostname, chassis, "memberof");
+        }
+
+        // Node belongs to its platform instance
+        if let Some(pname) = platform_name {
+            self.graph.add_edge(&hostname, pname, "memberof");
         }
     }
 
@@ -787,8 +906,8 @@ impl GraphBuilder {
             return;
         }
 
-        // Read compose.yaml for model name
-        let compose_file = self.compose_dir.join("..").join("compose.yaml");
+        // Read compose.yaml for model name (at repo root)
+        let compose_file = self.repo_root().join("compose.yaml");
         let model_name = if let Ok(content) = fs::read_to_string(&compose_file) {
             if let Ok(data) = serde_yaml::from_str::<serde_yaml::Value>(&content) {
                 data.get("name")
@@ -812,9 +931,10 @@ impl GraphBuilder {
             attrs: HashMap::new(),
         });
 
-        // Connect platform → model
-        if self.graph.has_node("platform") {
-            self.graph.add_edge("platform", &model_name, "materializes");
+        // Connect each platform → model
+        let platform_names = self.platform_names.clone();
+        for pname in &platform_names {
+            self.graph.add_edge(pname, &model_name, "materializes");
         }
 
         // Track which components belong to packages
