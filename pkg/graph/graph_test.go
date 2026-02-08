@@ -23,7 +23,7 @@ func testGraph(t *testing.T) *PlatformGraph {
 			{Source: "platform", Target: "platform.foundation", Type: "contains"},
 			{Source: "platform", Target: "platform.interaction", Type: "contains"},
 			{Source: "platform", Target: "platform.cognition", Type: "contains"},
-			{Source: "interaction.applications.dashboards", Target: "platform.interaction", Type: "attaches"},
+			{Source: "interaction.applications.dashboards", Target: "platform.interaction", Type: "distributes"},
 			{Source: "interaction.applications.dashboards", Target: "interaction.services.dashboards_grafana", Type: "requires"},
 			{Source: "interaction.services.dashboards_grafana", Target: "interaction.softwares.grafana", Type: "requires"},
 			{Source: "interaction.services.dashboards_grafana", Target: "foundation.variables.domain", Type: "parametrizes"},
@@ -115,7 +115,7 @@ func TestEdgesFrom(t *testing.T) {
 	}
 
 	// No edges of this type
-	attaches := g.EdgesFrom("platform", "attaches")
+	attaches := g.EdgesFrom("platform", "distributes")
 	if len(attaches) != 0 {
 		t.Errorf("EdgesFrom(platform, attaches) = %d, want 0", len(attaches))
 	}

@@ -104,7 +104,7 @@ func (imp *Impact) analyzeComponent(g *graph.PlatformGraph, node *graph.Platform
 
 	// Direct: chassis attachment
 	var chassis []string
-	for _, e := range g.EdgesTo(node.Name, "attaches") {
+	for _, e := range g.EdgesTo(node.Name, "distributes") {
 		chassis = append(chassis, e.From().Name)
 	}
 	sort.Strings(chassis)
@@ -117,7 +117,7 @@ func (imp *Impact) analyzeComponent(g *graph.PlatformGraph, node *graph.Platform
 	// Direct: nodes serving this component's chassis
 	nodeSet := make(map[string]bool)
 	for _, ch := range chassis {
-		for _, e := range g.EdgesTo(ch, "memberof") {
+		for _, e := range g.EdgesTo(ch, "allocates") {
 			nodeSet[e.From().Name] = true
 		}
 	}
@@ -150,7 +150,7 @@ func (imp *Impact) analyzeComponent(g *graph.PlatformGraph, node *graph.Platform
 	// Transitive: all chassis paths affected
 	transitiveChassisSet := make(map[string]bool)
 	for _, comp := range transitiveComps {
-		for _, e := range g.EdgesTo(comp, "attaches") {
+		for _, e := range g.EdgesTo(comp, "distributes") {
 			transitiveChassisSet[e.From().Name] = true
 		}
 	}
@@ -210,10 +210,10 @@ func (imp *Impact) analyzeVariable(g *graph.PlatformGraph, node *graph.PlatformN
 	chassisSet := make(map[string]bool)
 	nodeSet := make(map[string]bool)
 	for _, comp := range consumers {
-		for _, e := range g.EdgesTo(comp, "attaches") {
+		for _, e := range g.EdgesTo(comp, "distributes") {
 			ch := e.From().Name
 			chassisSet[ch] = true
-			for _, ne := range g.EdgesTo(ch, "memberof") {
+			for _, ne := range g.EdgesTo(ch, "allocates") {
 				nodeSet[ne.From().Name] = true
 			}
 		}
@@ -245,7 +245,7 @@ func (imp *Impact) analyzeVariable(g *graph.PlatformGraph, node *graph.PlatformN
 func (imp *Impact) analyzeChassis(g *graph.PlatformGraph, node *graph.PlatformNode) {
 	// Direct: components attached
 	var components []string
-	for _, e := range g.EdgesFrom(node.Name, "attaches") {
+	for _, e := range g.EdgesFrom(node.Name, "distributes") {
 		components = append(components, e.To().Name)
 	}
 	sort.Strings(components)
@@ -257,7 +257,7 @@ func (imp *Impact) analyzeChassis(g *graph.PlatformGraph, node *graph.PlatformNo
 
 	// Direct: nodes allocated
 	var nodes []string
-	for _, e := range g.EdgesTo(node.Name, "memberof") {
+	for _, e := range g.EdgesTo(node.Name, "allocates") {
 		nodes = append(nodes, e.From().Name)
 	}
 	sort.Strings(nodes)
@@ -292,7 +292,7 @@ func (imp *Impact) analyzeChassis(g *graph.PlatformGraph, node *graph.PlatformNo
 func (imp *Impact) analyzeNode(g *graph.PlatformGraph, node *graph.PlatformNode) {
 	// Direct: chassis paths this node serves
 	var chassisPaths []string
-	for _, e := range g.EdgesFrom(node.Name, "memberof") {
+	for _, e := range g.EdgesFrom(node.Name, "allocates") {
 		chassisPaths = append(chassisPaths, e.To().Name)
 	}
 	sort.Strings(chassisPaths)
@@ -305,7 +305,7 @@ func (imp *Impact) analyzeNode(g *graph.PlatformGraph, node *graph.PlatformNode)
 	// Direct: chassis paths that would have zero nodes if this node is removed
 	var zeroNodePaths []string
 	for _, chPath := range chassisPaths {
-		members := g.EdgesTo(chPath, "memberof")
+		members := g.EdgesTo(chPath, "allocates")
 		if len(members) == 1 {
 			zeroNodePaths = append(zeroNodePaths, chPath)
 		}
@@ -320,7 +320,7 @@ func (imp *Impact) analyzeNode(g *graph.PlatformGraph, node *graph.PlatformNode)
 	// Transitive: components that would lose infrastructure
 	componentSet := make(map[string]bool)
 	for _, chPath := range zeroNodePaths {
-		for _, e := range g.EdgesFrom(chPath, "attaches") {
+		for _, e := range g.EdgesFrom(chPath, "distributes") {
 			componentSet[e.To().Name] = true
 		}
 	}

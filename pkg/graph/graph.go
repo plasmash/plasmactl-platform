@@ -31,7 +31,7 @@ func (n *PlatformNode) ID() int64 { return n.uid }
 // PlatformEdge represents a directed edge in the platform dependency graph.
 type PlatformEdge struct {
 	from, to *PlatformNode
-	Type     string // "attaches", "contains", "parametrizes", etc.
+	Type     string // "distributes", "contains", "parametrizes", etc.
 }
 
 // From returns the source node.

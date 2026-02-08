@@ -766,7 +766,7 @@ impl GraphBuilder {
                 path: None,
                 attrs: HashMap::new(),
             });
-            self.graph.add_edge(&hostname, chassis, "memberof");
+            self.graph.add_edge(&hostname, chassis, "allocates");
         }
 
         // Node executes its platform instance
@@ -857,7 +857,7 @@ impl GraphBuilder {
                     _ => continue,
                 };
                 if !role_name.is_empty() && self.graph.has_node(&role_name) {
-                    self.graph.add_edge(&hosts, &role_name, "attaches");
+                    self.graph.add_edge(&hosts, &role_name, "distributes");
                 }
             }
         }

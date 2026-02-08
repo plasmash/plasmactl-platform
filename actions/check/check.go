@@ -114,7 +114,7 @@ func (c *Check) checkComponents(g *graph.PlatformGraph) SectionResult {
 	components := g.NodesByType("component")
 	attachedComponents := make(map[string]bool)
 	for _, comp := range components {
-		edges := g.EdgesTo(comp.Name, "attaches")
+		edges := g.EdgesTo(comp.Name, "distributes")
 		if len(edges) > 0 {
 			attachedComponents[comp.Name] = true
 		}
@@ -266,7 +266,7 @@ func (c *Check) checkModel(g *graph.PlatformGraph) SectionResult {
 	// 3. Unused packages: packages whose components are all unreachable from attached components
 	attachedComponents := make(map[string]bool)
 	for _, comp := range g.NodesByType("component") {
-		if edges := g.EdgesTo(comp.Name, "attaches"); len(edges) > 0 {
+		if edges := g.EdgesTo(comp.Name, "distributes"); len(edges) > 0 {
 			attachedComponents[comp.Name] = true
 		}
 	}
@@ -318,7 +318,7 @@ func (c *Check) checkChassis(g *graph.PlatformGraph) SectionResult {
 	// 1. Empty chassis paths: paths with zero node allocations
 	var emptyPaths []string
 	for _, ch := range chassisNodes {
-		nodes := g.EdgesTo(ch.Name, "memberof")
+		nodes := g.EdgesTo(ch.Name, "allocates")
 		if len(nodes) == 0 {
 			emptyPaths = append(emptyPaths, ch.Name)
 		}
@@ -339,7 +339,7 @@ func (c *Check) checkChassis(g *graph.PlatformGraph) SectionResult {
 	// 2. Unattached paths: paths with zero component attachments
 	var unattachedPaths []string
 	for _, ch := range chassisNodes {
-		attachments := g.EdgesFrom(ch.Name, "attaches")
+		attachments := g.EdgesFrom(ch.Name, "distributes")
 		if len(attachments) == 0 {
 			unattachedPaths = append(unattachedPaths, ch.Name)
 		}
@@ -360,8 +360,8 @@ func (c *Check) checkChassis(g *graph.PlatformGraph) SectionResult {
 	// 3. Single-node chassis paths (no redundancy)
 	var singleNode []string
 	for _, ch := range chassisNodes {
-		nodes := g.EdgesTo(ch.Name, "memberof")
-		attachments := g.EdgesFrom(ch.Name, "attaches")
+		nodes := g.EdgesTo(ch.Name, "allocates")
+		attachments := g.EdgesFrom(ch.Name, "distributes")
 		if len(nodes) == 1 && len(attachments) > 0 {
 			singleNode = append(singleNode, fmt.Sprintf("%s (%d component(s), 1 node)", ch.Name, len(attachments)))
 		}
@@ -391,7 +391,7 @@ func (c *Check) checkNodes(g *graph.PlatformGraph) SectionResult {
 	// 1. Nodes with no chassis allocations
 	var unallocated []string
 	for _, n := range infraNodes {
-		allocations := g.EdgesFrom(n.Name, "memberof")
+		allocations := g.EdgesFrom(n.Name, "allocates")
 		if len(allocations) == 0 {
 			unallocated = append(unallocated, n.Name)
 		}
@@ -414,8 +414,8 @@ func (c *Check) checkNodes(g *graph.PlatformGraph) SectionResult {
 	chassisNodes := g.NodesByKind("chassis")
 	var spof []string
 	for _, ch := range chassisNodes {
-		members := g.EdgesTo(ch.Name, "memberof")
-		attachments := g.EdgesFrom(ch.Name, "attaches")
+		members := g.EdgesTo(ch.Name, "allocates")
+		attachments := g.EdgesFrom(ch.Name, "distributes")
 		if len(members) == 1 && len(attachments) > 0 {
 			spof = append(spof, fmt.Sprintf("%s → sole node: %s (%d component(s))",
 				ch.Name, members[0].From().Name, len(attachments)))
