@@ -769,9 +769,9 @@ impl GraphBuilder {
             self.graph.add_edge(&hostname, chassis, "memberof");
         }
 
-        // Node belongs to its platform instance
+        // Node executes its platform instance
         if let Some(pname) = platform_name {
-            self.graph.add_edge(&hostname, pname, "memberof");
+            self.graph.add_edge(&hostname, pname, "executes");
         }
     }
 
