@@ -7,6 +7,7 @@ import (
 
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr/pkg/action"
+	"github.com/plasmash/plasmactl-platform/pkg/dns"
 	"github.com/plasmash/plasmactl-platform/pkg/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -139,6 +140,34 @@ func (c *Create) Execute() error {
 		platform.Infrastructure.SSHKeyID = c.SSHKeyID
 	}
 
+	// Set DNS provider defaults
+	switch c.DNSProvider {
+	case "ovh":
+		platform.DNS.API = schema.APIConfig{
+			Token: "{{ .keyring.ovh_api_token }}",
+		}
+		if platform.DNS.Region == "" {
+			platform.DNS.Region = "eu"
+		}
+	case "cloudflare":
+		platform.DNS.API = schema.APIConfig{
+			Token: "{{ .keyring.cloudflare_api_token }}",
+		}
+	case "gandi":
+		platform.DNS.API = schema.APIConfig{
+			Token: "{{ .keyring.gandi_api_token }}",
+		}
+	case "inwx":
+		platform.DNS.API = schema.APIConfig{
+			Token: "{{ .keyring.inwx_api_token }}",
+		}
+	}
+
+	// Derive DNS zone from domain if not set
+	if platform.DNS.Zone == "" && platform.DNS.Domain != "" {
+		platform.DNS.Zone = dns.DeriveZone(platform.DNS.Domain)
+	}
+
 	data, err := yaml.Marshal(platform)
 	if err != nil {
 		return fmt.Errorf("failed to marshal platform.yaml: %w", err)
@@ -170,18 +199,6 @@ func (c *Create) Execute() error {
 
 	c.Term().Success().Printfln("Created platform scaffold at %s", instDir)
 
-	// Configure DNS if not skipped and not manual
-	if !c.SkipDNS && c.DNSProvider != "manual" {
-		c.Term().Info().Println()
-		c.Term().Info().Println("Configuring DNS records...")
-		if err := c.configureDNS(); err != nil {
-			c.Term().Warning().Printfln("DNS configuration failed: %v", err)
-			c.Term().Warning().Println("You can configure DNS manually or retry with platform:validate")
-		} else {
-			c.Term().Success().Println("DNS records configured successfully")
-		}
-	}
-
 	// Print next steps
 	c.Term().Info().Println()
 	c.Term().Info().Println("Next steps:")
@@ -202,20 +219,3 @@ func (c *Create) Execute() error {
 	return nil
 }
 
-// configureDNS sets up DNS records (MX, DKIM, DMARC, SPF, rDNS)
-func (c *Create) configureDNS() error {
-	// TODO: Implement DNS configuration via Terraform
-	// This will use terraform-exec to:
-	// 1. Generate Terraform configuration for the DNS provider
-	// 2. Apply the configuration to create:
-	//    - MX records
-	//    - DKIM records
-	//    - DMARC records
-	//    - SPF records
-	//    - rDNS (if supported by provider)
-
-	c.Term().Info().Println("  DNS configuration via Terraform is not yet implemented")
-	c.Term().Info().Println("  Manual DNS setup required for now")
-
-	return nil
-}

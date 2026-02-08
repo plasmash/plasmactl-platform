@@ -31,9 +31,12 @@ type Infrastructure struct {
 
 // DNSConfig defines DNS provider configuration
 type DNSConfig struct {
-	Provider string `yaml:"provider"`          // ovh, cloudflare, route53, gcp, manual
-	Domain   string `yaml:"domain"`            // e.g., dev.skilld.cloud
-	// Records are auto-configured: MX, DKIM, DMARC, SPF, rDNS
+	Provider string    `yaml:"provider"`          // ovh, cloudflare, gandi, inwx, manual
+	Domain   string    `yaml:"domain"`            // e.g., dev.skilld.cloud
+	Zone     string    `yaml:"zone,omitempty"`    // DNS zone (registered domain), derived from domain if empty
+	API      APIConfig `yaml:"api,omitempty"`     // DNS provider API credentials
+	Region   string    `yaml:"region,omitempty"`  // DNS provider region (e.g., "eu" for OVH)
+	DKIMKey  string    `yaml:"dkim_key,omitempty"` // DKIM public key (base64, from vault)
 }
 
 // APIConfig defines API connection settings
