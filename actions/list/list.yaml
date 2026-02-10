@@ -9,3 +9,17 @@ action:
       description: Output format (json, yaml). Default is table.
       type: string
       default: ""
+  result:
+    type: object
+    properties:
+      platforms:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            domain:
+              type: string
+            provider:
+              type: string

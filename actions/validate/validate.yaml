@@ -18,3 +18,27 @@ action:
       description: Skip mail authentication validation (DKIM, DMARC, SPF)
       type: boolean
       default: false
+  result:
+    type: object
+    properties:
+      name:
+        type: string
+      valid:
+        type: boolean
+      checks:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            status:
+              type: string
+            value:
+              type: string
+      node_count:
+        type: integer
+      has_errors:
+        type: boolean
+      has_warnings:
+        type: boolean

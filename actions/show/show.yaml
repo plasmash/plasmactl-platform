@@ -14,3 +14,21 @@ action:
       description: Output format (json, yaml). Default is human-readable.
       type: string
       default: ""
+  result:
+    type: object
+    properties:
+      platform:
+        type: object
+      nodes:
+        type: array
+        items:
+          type: string
+      dns:
+        type: object
+        properties:
+          provider:
+            type: string
+          domain:
+            type: string
+          configured:
+            type: boolean

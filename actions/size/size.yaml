@@ -1,0 +1,65 @@
+runtime: plugin
+action:
+  title: Size Platform
+  description: "List and manage pool sizing that maps chassis sections to hardware"
+  arguments:
+    - name: name
+      title: Name
+      description: The name of the platform to size
+      required: true
+  options:
+    - name: suggest
+      title: Suggest
+      description: "Use the platform graph to suggest pool sizing interactively"
+      type: boolean
+      default: false
+    - name: add
+      title: Add
+      description: "Add a pool (requires --chassis, --machine, --count)"
+      type: string
+      default: ""
+    - name: remove
+      title: Remove
+      description: "Remove a pool by name"
+      type: string
+      default: ""
+    - name: chassis
+      shorthand: c
+      title: Chassis
+      description: "Chassis sections for the pool (can be specified multiple times)"
+      type: array
+      default: []
+    - name: machine
+      shorthand: m
+      title: Machine
+      description: "Machine type for the pool"
+      type: string
+      default: ""
+    - name: count
+      shorthand: "n"
+      title: Count
+      description: "Number of nodes for the pool"
+      type: integer
+      default: 0
+  result:
+    type: object
+    properties:
+      pools:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            chassis:
+              type: array
+              items:
+                type: string
+            machine:
+              type: string
+            count:
+              type: integer
+            components:
+              type: array
+              items:
+                type: string

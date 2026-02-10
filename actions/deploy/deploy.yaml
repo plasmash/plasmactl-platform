@@ -45,3 +45,12 @@ action:
       description: Directory containing prepared model
       type: string
       default: ".plasma/prepare"
+  result:
+    type: object
+    properties:
+      environment:
+        type: string
+      tags:
+        type: string
+      success:
+        type: boolean

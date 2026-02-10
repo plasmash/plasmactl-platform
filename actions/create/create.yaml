@@ -55,3 +55,26 @@ action:
       description: Skip DNS configuration during provisioning
       type: boolean
       default: false
+  result:
+    type: object
+    properties:
+      name:
+        type: string
+      metal_provider:
+        type: string
+      dns_provider:
+        type: string
+      domain:
+        type: string
+      zone:
+        type: string
+      region:
+        type: string
+      project_id:
+        type: string
+      image:
+        type: string
+      ssh_key_id:
+        type: string
+      path:
+        type: string

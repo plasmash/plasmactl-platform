@@ -14,6 +14,7 @@ import (
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/action"
+	"github.com/opentofu/tofudl"
 
 	"github.com/plasmash/plasmactl-platform/actions/check"
 	"github.com/plasmash/plasmactl-platform/actions/create"
@@ -22,9 +23,11 @@ import (
 	"github.com/plasmash/plasmactl-platform/actions/impact"
 	"github.com/plasmash/plasmactl-platform/actions/list"
 	"github.com/plasmash/plasmactl-platform/actions/show"
+	"github.com/plasmash/plasmactl-platform/actions/size"
 	"github.com/plasmash/plasmactl-platform/actions/up"
 	"github.com/plasmash/plasmactl-platform/actions/validate"
 	pkggraph "github.com/plasmash/plasmactl-platform/pkg/graph"
+	pkgtofu "github.com/plasmash/plasmactl-platform/pkg/tofu"
 )
 
 //go:embed actions/*/*.yaml
@@ -60,6 +63,11 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 	if err := p.initGraphBinary(); err != nil {
 		launchr.Log().Warn("failed to extract graph binary", "err", err)
 	}
+
+	// Resolve the OpenTofu binary (system PATH → cache → download).
+	if err := p.initTofuBinary(); err != nil {
+		launchr.Log().Debug("tofu binary not available", "err", err)
+	}
 	return nil
 }
 
@@ -87,6 +95,56 @@ func (p *Plugin) initGraphBinary() error {
 		return err
 	}
 	pkggraph.SetBinaryPath(binPath)
+	return nil
+}
+
+// initTofuBinary resolves the OpenTofu binary path using a three-tier strategy:
+//  1. System PATH — honor user's existing installation
+//  2. Cache hit — previously downloaded binary at ~/.cache/plasmactl/tofu/<version>/tofu
+//  3. Download — fetch via tofudl and cache for future runs
+func (p *Plugin) initTofuBinary() error {
+	// 1. System PATH — nothing to do, FindBinary() will pick it up via LookPath.
+	if path, err := exec.LookPath("tofu"); err == nil {
+		pkgtofu.SetBinaryPath(path)
+		return nil
+	}
+
+	// 2. Check cache.
+	version := pkgtofu.DefaultVersion
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		cacheDir = os.TempDir()
+	}
+	dir := filepath.Join(cacheDir, "plasmactl", "tofu", version)
+	name := "tofu"
+	if runtime.GOOS == "windows" {
+		name = "tofu.exe"
+	}
+	binPath := filepath.Join(dir, name)
+
+	if _, err = os.Stat(binPath); err == nil {
+		pkgtofu.SetBinaryPath(binPath)
+		return nil
+	}
+
+	// 3. Download via tofudl.
+	launchr.Log().Debug("downloading OpenTofu", "version", version)
+	dl, err := tofudl.New()
+	if err != nil {
+		return fmt.Errorf("failed to create tofudl downloader: %w", err)
+	}
+	binary, err := dl.Download(context.Background(), tofudl.DownloadOptVersion(tofudl.Version(version)))
+	if err != nil {
+		return fmt.Errorf("failed to download tofu %s: %w", version, err)
+	}
+	if err = os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("failed to create tofu cache dir: %w", err)
+	}
+	if err = os.WriteFile(binPath, binary, 0o755); err != nil {
+		return fmt.Errorf("failed to write tofu binary: %w", err)
+	}
+	pkgtofu.SetBinaryPath(binPath)
+	launchr.Log().Debug("tofu downloaded", "path", binPath)
 	return nil
 }
 
@@ -127,7 +185,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	// platform:create action
 	createYaml, _ := actionYamlFS.ReadFile("actions/create/create.yaml")
 	createAction := action.NewFromYAML("platform:create", createYaml)
-	createAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
+	createAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		c := &create.Create{
@@ -145,14 +203,15 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		c.SetLogger(log)
 		c.SetTerm(term)
-		return c.Execute()
+		err := c.Execute()
+		return c.Result(), err
 	}))
 	actions = append(actions, createAction)
 
 	// platform:list action
 	listYaml, _ := actionYamlFS.ReadFile("actions/list/list.yaml")
 	listAction := action.NewFromYAML("platform:list", listYaml)
-	listAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
+	listAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		l := &list.List{
@@ -160,14 +219,15 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		l.SetLogger(log)
 		l.SetTerm(term)
-		return l.Execute()
+		err := l.Execute()
+		return l.Result(), err
 	}))
 	actions = append(actions, listAction)
 
 	// platform:show action
 	showYaml, _ := actionYamlFS.ReadFile("actions/show/show.yaml")
 	showAction := action.NewFromYAML("platform:show", showYaml)
-	showAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
+	showAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		s := &show.Show{
@@ -176,14 +236,15 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		s.SetLogger(log)
 		s.SetTerm(term)
-		return s.Execute()
+		err := s.Execute()
+		return s.Result(), err
 	}))
 	actions = append(actions, showAction)
 
 	// platform:validate action
 	validateYaml, _ := actionYamlFS.ReadFile("actions/validate/validate.yaml")
 	validateAction := action.NewFromYAML("platform:validate", validateYaml)
-	validateAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
+	validateAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		v := &validate.Validate{
@@ -193,14 +254,37 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		v.SetLogger(log)
 		v.SetTerm(term)
-		return v.Execute()
+		err := v.Execute()
+		return v.Result(), err
 	}))
 	actions = append(actions, validateAction)
+
+	// platform:size action
+	sizeYaml, _ := actionYamlFS.ReadFile("actions/size/size.yaml")
+	sizeAction := action.NewFromYAML("platform:size", sizeYaml)
+	sizeAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
+		input := a.Input()
+		log, term := getLoggerTerm(a)
+		sz := &size.Size{
+			Name:    input.Arg("name").(string),
+			Suggest: input.Opt("suggest").(bool),
+			Add:     input.Opt("add").(string),
+			Remove:  input.Opt("remove").(string),
+			Chassis: action.InputOptSlice[string](input, "chassis"),
+			Machine: input.Opt("machine").(string),
+			Count:   input.Opt("count").(int),
+		}
+		sz.SetLogger(log)
+		sz.SetTerm(term)
+		err := sz.Execute()
+		return sz.Result(), err
+	}))
+	actions = append(actions, sizeAction)
 
 	// platform:destroy action
 	destroyYaml, _ := actionYamlFS.ReadFile("actions/destroy/destroy.yaml")
 	destroyAction := action.NewFromYAML("platform:destroy", destroyYaml)
-	destroyAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
+	destroyAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		d := &destroy.Destroy{
@@ -211,14 +295,15 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		d.SetLogger(log)
 		d.SetTerm(term)
-		return d.Execute()
+		err := d.Execute()
+		return d.Result(), err
 	}))
 	actions = append(actions, destroyAction)
 
 	// platform:deploy action
 	deployYaml, _ := actionYamlFS.ReadFile("actions/deploy/deploy.yaml")
 	deployAction := action.NewFromYAML("platform:deploy", deployYaml)
-	deployAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
+	deployAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		d := &deploy.Deploy{
@@ -234,7 +319,8 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		d.SetLogger(log)
 		d.SetTerm(term)
-		return d.Execute()
+		err := d.Execute()
+		return d.Result(), err
 	}))
 	actions = append(actions, deployAction)
 

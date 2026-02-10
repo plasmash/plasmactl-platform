@@ -18,3 +18,10 @@ action:
       description: Keep DNS records (don't delete MX, DKIM, DMARC, SPF)
       type: boolean
       default: false
+  result:
+    type: object
+    properties:
+      name:
+        type: string
+      success:
+        type: boolean
