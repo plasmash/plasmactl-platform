@@ -26,7 +26,7 @@ type ValidateResult struct {
 	Checks     []ValidationCheck `json:"checks"`
 	NodeCount  int               `json:"node_count"`
 	HasErrors  bool              `json:"has_errors"`
-	HasWarning bool              `json:"has_warnings"`
+	HasWarnings bool             `json:"has_warnings"`
 }
 
 // Validate implements the platform:validate command
@@ -239,7 +239,7 @@ func (v *Validate) Execute() error {
 	// Finalize result
 	v.result.NodeCount = nodeCount
 	v.result.HasErrors = hasErrors
-	v.result.HasWarning = hasWarnings
+	v.result.HasWarnings = hasWarnings
 	v.result.Valid = !hasErrors
 
 	v.Term().Info().Println()

@@ -86,8 +86,7 @@ func (d *Deploy) Execute() error {
 
 	// Check if hosts cache exists
 	if !d.cacheExists() {
-		d.Term().Warning().Println("Inventory cache does not exist, skipping deployment")
-		return nil
+		return fmt.Errorf("inventory cache does not exist, cannot deploy (run platform:prepare first)")
 	}
 
 	d.Term().Info().Printfln("Deploying %s to %s...", d.Tags, d.Environment)

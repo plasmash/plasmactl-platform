@@ -93,7 +93,10 @@ func (s *Size) list(platform schema.Platform) error {
 		return nil
 	}
 
-	g, _ := graph.Load()
+	g, err := graph.Load()
+	if err != nil {
+		s.Log().Debug("Graph not available, component details will be omitted", "error", err)
+	}
 
 	names := sortedKeys(platform.Pools)
 
