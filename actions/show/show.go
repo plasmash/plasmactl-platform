@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/launchrctl/launchr/pkg/action"
 	"github.com/plasmash/plasmactl-platform/pkg/schema"
@@ -87,35 +88,34 @@ func (s *Show) Execute() error {
 	}
 
 	// Human-readable output
-	fmt.Printf("Name:      %s\n", platform.Name)
-	fmt.Printf("Domain:    %s\n", platform.DNS.Domain)
-	fmt.Printf("Provider:  %s\n", platform.Infrastructure.MetalProvider)
+	term := s.Term()
+	term.Printfln("Name:      %s", platform.Name)
+	term.Printfln("Domain:    %s", platform.DNS.Domain)
+	term.Printfln("Provider:  %s", platform.Infrastructure.MetalProvider)
 	if platform.Infrastructure.API.URI != "" {
-		fmt.Printf("API:       %s\n", platform.Infrastructure.API.URI)
+		term.Printfln("API:       %s", platform.Infrastructure.API.URI)
 	}
 	// DNS Status
-	fmt.Printf("DNS:\n")
-	fmt.Printf("  Provider:   %s\n", platform.DNS.Provider)
+	term.Printfln("DNS:")
+	term.Printfln("  Provider:   %s", platform.DNS.Provider)
 	if dnsConfigured {
-		fmt.Printf("  Status:     configured\n")
+		term.Printfln("  Status:     configured")
 	} else {
-		fmt.Printf("  Status:     not configured\n")
+		term.Printfln("  Status:     not configured")
 	}
 	if platform.Networking.PrivateNetwork != "" {
-		fmt.Printf("Network:   %s\n", platform.Networking.PrivateNetwork)
+		term.Printfln("Network:   %s", platform.Networking.PrivateNetwork)
 	}
-	fmt.Printf("Nodes:     %d\n", len(nodes))
+	term.Printfln("Nodes:     %d", len(nodes))
 	if len(nodes) > 0 {
 		for _, node := range nodes {
-			fmt.Printf("  - %s\n", node)
+			term.Printfln("  - %s", node)
 		}
 	}
-	if len(platform.Chassis) > 0 {
-		fmt.Println("Chassis:")
-		for chassis, profiles := range platform.Chassis {
-			for _, profile := range profiles {
-				fmt.Printf("  - %s: %s x%d\n", chassis, profile.Type, profile.Count)
-			}
+	if len(platform.Pools) > 0 {
+		term.Printfln("Pools:")
+		for name, pool := range platform.Pools {
+			term.Printfln("  - %s: %s x%d (%s)", name, pool.Machine, pool.Count, strings.Join(pool.Chassis, ", "))
 		}
 	}
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"text/tabwriter"
 
 	"github.com/launchrctl/launchr/pkg/action"
 	"github.com/plasmash/plasmactl-platform/pkg/schema"
@@ -102,12 +101,11 @@ func (l *List) Execute() error {
 	}
 
 	// Table output
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "NAME\tDOMAIN\tPROVIDER\tNODES")
+	term := l.Term()
+	term.Printfln("%-10s %-20s %-10s %s", "NAME", "DOMAIN", "PROVIDER", "NODES")
 	for _, p := range platforms {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", p.Name, p.Domain, p.MetalProvider, p.NodeCount)
+		term.Printfln("%-10s %-20s %-10s %d", p.Name, p.Domain, p.MetalProvider, p.NodeCount)
 	}
-	w.Flush()
 
 	return nil
 }
