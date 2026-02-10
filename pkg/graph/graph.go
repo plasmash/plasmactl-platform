@@ -4,6 +4,7 @@
 package graph
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -67,12 +68,11 @@ func Load() (*PlatformGraph, error) {
 		return nil, fmt.Errorf("graph binary not registered (plasmactl-platform plugin not loaded?)")
 	}
 	cmd := exec.Command(binaryPath, "", "--format=json")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("graph binary failed: %w\nstderr: %s", err, exitErr.Stderr)
-		}
-		return nil, fmt.Errorf("graph binary failed: %w", err)
+		return nil, fmt.Errorf("graph binary failed: %w\nstderr: %s", err, stderr.String())
 	}
 
 	var raw rawGraphResult
