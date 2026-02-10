@@ -156,33 +156,47 @@ func (v *Validate) Execute() error {
 		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "pass", Value: "manual"})
 	}
 
-	// Validate chassis configuration
+	// Validate pool configuration
 	v.Term().Info().Println()
-	v.Term().Info().Println("Chassis Configuration:")
-	if len(platform.Chassis) == 0 {
-		v.Term().Warning().Println("  ! No chassis profiles defined")
-		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "chassis", Status: "warning", Value: "0"})
+	v.Term().Info().Println("Pool Configuration:")
+	if len(platform.Pools) == 0 {
+		v.Term().Warning().Println("  ! No pools defined")
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "pools", Status: "warning", Value: "0"})
 		hasWarnings = true
 	} else {
 		totalNodes := 0
-		for chassis, profiles := range platform.Chassis {
-			for _, profile := range profiles {
-				if profile.Count <= 0 {
-					v.Term().Error().Printfln("  ✗ Invalid count for %s/%s: %d", chassis, profile.Type, profile.Count)
-					v.result.Checks = append(v.result.Checks, ValidationCheck{
-						Name:   fmt.Sprintf("chassis_%s", chassis),
-						Status: "fail",
-						Value:  fmt.Sprintf("%s: invalid count %d", profile.Type, profile.Count),
-					})
-					hasErrors = true
-				} else {
-					totalNodes += profile.Count
-				}
+		for name, pool := range platform.Pools {
+			if pool.Count <= 0 {
+				v.Term().Error().Printfln("  ✗ Invalid count for pool %s: %d", name, pool.Count)
+				v.result.Checks = append(v.result.Checks, ValidationCheck{
+					Name:   fmt.Sprintf("pool_%s", name),
+					Status: "fail",
+					Value:  fmt.Sprintf("%s: invalid count %d", pool.Machine, pool.Count),
+				})
+				hasErrors = true
+			} else if pool.Machine == "" {
+				v.Term().Error().Printfln("  ✗ No machine specified for pool %s", name)
+				v.result.Checks = append(v.result.Checks, ValidationCheck{
+					Name:   fmt.Sprintf("pool_%s", name),
+					Status: "fail",
+					Value:  "no machine specified",
+				})
+				hasErrors = true
+			} else if len(pool.Chassis) == 0 {
+				v.Term().Error().Printfln("  ✗ No chassis sections for pool %s", name)
+				v.result.Checks = append(v.result.Checks, ValidationCheck{
+					Name:   fmt.Sprintf("pool_%s", name),
+					Status: "fail",
+					Value:  "no chassis sections",
+				})
+				hasErrors = true
+			} else {
+				totalNodes += pool.Count
 			}
 		}
 		if totalNodes > 0 {
-			v.Term().Success().Printfln("  ✓ Chassis profiles: %d paths, %d total nodes", len(platform.Chassis), totalNodes)
-			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "chassis", Status: "pass", Value: fmt.Sprintf("%d paths", len(platform.Chassis))})
+			v.Term().Success().Printfln("  ✓ Pools: %d pools, %d total nodes", len(platform.Pools), totalNodes)
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "pools", Status: "pass", Value: fmt.Sprintf("%d pools", len(platform.Pools))})
 		}
 	}
 

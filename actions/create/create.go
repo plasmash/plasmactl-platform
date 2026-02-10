@@ -203,18 +203,23 @@ func (c *Create) Execute() error {
 	c.Term().Info().Println()
 	c.Term().Info().Println("Next steps:")
 	if c.MetalProvider != "manual" {
-		c.Term().Info().Printfln("  1. Ensure credentials are configured: plasmactl keyring:login %s", c.MetalProvider)
+		step := 1
+		c.Term().Info().Printfln("  %d. Ensure credentials are configured: plasmactl keyring:login %s", step, c.MetalProvider)
+		step++
 		if c.DNSProvider != "manual" && c.DNSProvider != c.MetalProvider {
-			c.Term().Info().Printfln("  2. Ensure DNS credentials: plasmactl keyring:login %s", c.DNSProvider)
-			c.Term().Info().Printfln("  3. Provision nodes: plasmactl node:provision %s -c <chassis>:<offer>:<count>", c.Name)
-		} else {
-			c.Term().Info().Printfln("  2. Provision nodes: plasmactl node:provision %s -c <chassis>:<offer>:<count>", c.Name)
+			c.Term().Info().Printfln("  %d. Ensure DNS credentials: plasmactl keyring:login %s", step, c.DNSProvider)
+			step++
 		}
+		c.Term().Info().Printfln("  %d. Size the platform: plasmactl platform:size %s --suggest", step, c.Name)
+		step++
+		c.Term().Info().Printfln("  %d. Provision nodes: plasmactl node:provision %s", step, c.Name)
+		step++
+		c.Term().Info().Printfln("  %d. Deploy: plasmactl platform:deploy %s", step, c.Name)
 	} else {
 		c.Term().Info().Printfln("  1. Add nodes: plasmactl node:add %s --hostname <name> --public-ip <ip>", c.Name)
 		c.Term().Info().Printfln("  2. Or create node YAML files directly in %s", nodesDir)
+		c.Term().Info().Printfln("  3. Deploy: plasmactl platform:deploy %s", c.Name)
 	}
-	c.Term().Info().Printfln("  3. Deploy: plasmactl platform:deploy %s", c.Name)
 
 	return nil
 }

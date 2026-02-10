@@ -11,7 +11,7 @@ type Platform struct {
 	Infrastructure Infrastructure            `yaml:"infrastructure"`
 	DNS            DNSConfig                  `yaml:"dns,omitempty"`
 	Networking     Networking                 `yaml:"networking,omitempty"`
-	Chassis        map[string][]ChassisProfile `yaml:"chassis,omitempty"`
+	Pools          map[string]Pool             `yaml:"pools,omitempty"`
 
 	Defaults    PlatformDefaults  `yaml:"defaults,omitempty"`
 	Features    PlatformFeatures  `yaml:"features,omitempty"`
@@ -73,10 +73,11 @@ type DataBusConfig struct {
 	BrokerCount int    `yaml:"broker_count,omitempty"`
 }
 
-// ChassisProfile defines a hardware profile for a chassis attachment
-type ChassisProfile struct {
-	Type  string `yaml:"type"`  // Offer type (e.g., GP1-L, GPU-3090)
-	Count int    `yaml:"count"` // Number of nodes
+// Pool defines a group of nodes serving co-located chassis sections
+type Pool struct {
+	Chassis []string `yaml:"chassis"`  // chassis sections co-located on these nodes
+	Machine string   `yaml:"machine"`  // hardware identifier (provider-specific)
+	Count   int      `yaml:"count"`    // number of nodes
 }
 
 // PlatformDefaults defines default values for nodes
@@ -121,7 +122,7 @@ func NewPlatform(name, metalProvider, dnsProvider, domain string) *Platform {
 		Networking: Networking{
 			PrivateNetwork: "192.168.0.0/16",
 		},
-		Chassis: make(map[string][]ChassisProfile),
+		Pools: make(map[string]Pool),
 	}
 }
 
