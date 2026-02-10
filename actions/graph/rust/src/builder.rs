@@ -48,6 +48,11 @@ struct FlowPending {
     output: String,
 }
 
+struct VarsRefPending {
+    var_name: String,
+    refs: Vec<String>,
+}
+
 pub struct GraphBuilder {
     compose_dir: PathBuf,
     pub graph: PlatformGraph,
@@ -93,6 +98,8 @@ impl GraphBuilder {
         let mut deps_pending: Vec<DepsPending> = Vec::new();
         let mut scan_data: Vec<ScanEntry> = Vec::new();
         let mut flow_pending: Vec<FlowPending> = Vec::new();
+        let mut vars_ref_pending: Vec<VarsRefPending> = Vec::new();
+        let jinja_env = minijinja::Environment::new();
         let mut n_comp = 0u32;
         let mut n_gv = 0u32;
 
@@ -151,6 +158,7 @@ impl GraphBuilder {
                         continue;
                     }
                     let text = String::from_utf8_lossy(&content);
+                    vars_ref_pending.extend(extract_var_refs(&text, &jinja_env));
                     let var_names: Vec<String> = toplevel_re
                         .captures_iter(&text)
                         .filter_map(|c| {
@@ -206,6 +214,9 @@ impl GraphBuilder {
                         continue;
                     }
                     let text = String::from_utf8_lossy(&content);
+                    if !is_vault {
+                        vars_ref_pending.extend(extract_var_refs(&text, &jinja_env));
+                    }
                     let var_names: Vec<String> = toplevel_re
                         .captures_iter(&text)
                         .filter_map(|c| {
@@ -293,6 +304,7 @@ impl GraphBuilder {
             if depth == 5 && subdir == "defaults" && filename == "main.yaml" {
                 if let Ok(content) = fs::read(path) {
                     let text = String::from_utf8_lossy(&content);
+                    vars_ref_pending.extend(extract_var_refs(&text, &jinja_env));
                     let var_names: Vec<String> = toplevel_re
                         .captures_iter(&text)
                         .filter_map(|c| {
@@ -415,6 +427,18 @@ impl GraphBuilder {
         }
         if debug {
             eprintln!("  apply_defaults: {:.3}s", t.elapsed().as_secs_f64());
+        }
+
+        // 3.5. Variable-to-variable references
+        let t = Instant::now();
+        let n_var_refs = self.build_variable_references(&vars_ref_pending);
+        if debug {
+            eprintln!(
+                "  build_variable_references: {:.3}s (pending: {}, edges: {})",
+                t.elapsed().as_secs_f64(),
+                vars_ref_pending.len(),
+                n_var_refs
+            );
         }
 
         // 4. Apply dependencies
@@ -863,6 +887,19 @@ impl GraphBuilder {
         }
     }
 
+    fn build_variable_references(&mut self, pending: &[VarsRefPending]) -> usize {
+        let mut n_edges = 0;
+        for entry in pending {
+            for ref_var in &entry.refs {
+                if ref_var != &entry.var_name && self.known_variables.contains(ref_var.as_str()) {
+                    self.graph.add_edge(ref_var, &entry.var_name, "parametrizes");
+                    n_edges += 1;
+                }
+            }
+        }
+        n_edges
+    }
+
     fn scan_variables(&mut self, scan_data: &[ScanEntry]) {
         use rayon::prelude::*;
 
@@ -1201,4 +1238,44 @@ fn guess_kind_from_name(name: &str) -> &'static str {
     } else {
         "helper"
     }
+}
+
+/// Extract variable-to-variable references from a YAML vars file using minijinja.
+/// Returns (var_name, referenced_var_names) pairs for values that reference other variables.
+fn extract_var_refs(text: &str, env: &minijinja::Environment) -> Vec<VarsRefPending> {
+    let data: serde_yaml::Value = match serde_yaml::from_str(text) {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+    let map = match data.as_mapping() {
+        Some(m) => m,
+        None => return Vec::new(),
+    };
+    let mut result = Vec::new();
+    for (key, value) in map {
+        let var_name = match key.as_str() {
+            Some(k) if !k.starts_with('_') => k,
+            _ => continue,
+        };
+        let value_str = match value {
+            serde_yaml::Value::String(s) => s.clone(),
+            serde_yaml::Value::Null | serde_yaml::Value::Bool(_) | serde_yaml::Value::Number(_) => continue,
+            _ => match serde_yaml::to_string(value) {
+                Ok(s) => s,
+                Err(_) => continue,
+            },
+        };
+        let tmpl = match env.template_from_str(&value_str) {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        let refs: Vec<String> = tmpl.undeclared_variables(false).into_iter().collect();
+        if !refs.is_empty() {
+            result.push(VarsRefPending {
+                var_name: var_name.to_string(),
+                refs,
+            });
+        }
+    }
+    result
 }

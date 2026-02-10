@@ -94,7 +94,7 @@ impl PlatformGraph {
         self.graph.edge_count()
     }
 
-    /// Get all descendants, treating variable nodes as leaves.
+    /// Get all descendants of a node (forward dependencies).
     pub fn descendants(&self, name: &str, depth: i32) -> HashSet<String> {
         let Some(&start) = self.node_indices.get(name) else {
             return HashSet::new();
@@ -113,9 +113,6 @@ impl PlatformGraph {
         let mut visited = HashSet::new();
         visited.insert(start);
         while let Some(idx) = queue.pop_front() {
-            if self.graph[idx].kind == "variable" {
-                continue;
-            }
             for succ in self.graph.neighbors(idx) {
                 if visited.insert(succ) {
                     result.insert(self.graph[succ].name.clone());
@@ -132,9 +129,6 @@ impl PlatformGraph {
         for _ in 0..max_depth {
             let mut next_level = HashSet::new();
             for &idx in &current_level {
-                if self.graph[idx].kind == "variable" {
-                    continue;
-                }
                 for succ in self.graph.neighbors(idx) {
                     let name = &self.graph[succ].name;
                     if result.insert(name.clone()) {

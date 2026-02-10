@@ -102,8 +102,7 @@ impl<'a> TreeRenderer<'a> {
                     type_prefix, connector, target, kind_str, circular_marker
                 ));
 
-                let is_variable = target_node.map(|n| n.kind == "variable").unwrap_or(false);
-                if depth != 0 && !is_circular && !is_variable {
+                if depth != 0 && !is_circular {
                     let new_depth = if depth > 0 { depth - 1 } else { -1 };
                     let child_prefix = if is_last {
                         format!("{}    ", type_prefix)
