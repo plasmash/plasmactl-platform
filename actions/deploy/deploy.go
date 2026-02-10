@@ -50,6 +50,11 @@ func (d *Deploy) Result() any {
 
 // Execute runs the platform:deploy action
 func (d *Deploy) Execute() error {
+	d.result = &DeployResult{
+		Environment: d.Environment,
+		Tags:        d.Tags,
+	}
+
 	var err error
 	d.originalDir, err = os.Getwd()
 	if err != nil {
@@ -346,13 +351,7 @@ func (d *Deploy) runAnsiblePlaybook(args, env []string, askpassScript string) er
 		return fmt.Errorf("failed to run ansible-playbook: %w", err)
 	}
 
-	// Build result
-	d.result = &DeployResult{
-		Environment: d.Environment,
-		Tags:        d.Tags,
-		Success:     true,
-	}
-
+	d.result.Success = true
 	d.Term().Success().Println("Deployment completed successfully")
 	return nil
 }

@@ -39,6 +39,8 @@ func (d *Destroy) Result() any {
 
 // Execute runs the platform:destroy action
 func (d *Destroy) Execute() error {
+	d.result = &DestroyResult{Name: d.Name}
+
 	instDir := filepath.Join("inst", d.Name)
 
 	// Check if platform exists
@@ -85,12 +87,7 @@ func (d *Destroy) Execute() error {
 		return fmt.Errorf("failed to remove platform directory: %w", err)
 	}
 
-	// Build result
-	d.result = &DestroyResult{
-		Name:    d.Name,
-		Success: true,
-	}
-
+	d.result.Success = true
 	d.Term().Success().Printfln("Platform %q destroyed", d.Name)
 	return nil
 }
