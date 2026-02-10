@@ -5,12 +5,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
+
+	pkgtofu "github.com/plasmash/plasmactl-platform/pkg/tofu"
 )
 
 // Config holds DNS provider configuration for HCL generation
@@ -36,28 +37,30 @@ func RegisterTemplate(provider, tmpl string) {
 	providerTemplates[provider] = tmpl
 }
 
-// Manager handles DNS Terraform operations
+// Manager handles DNS operations via OpenTofu
 type Manager struct {
 	workDir string
 	tf      *tfexec.Terraform
 }
 
-// NewManager creates a new DNS terraform manager
-func NewManager(envDir string) (*Manager, error) {
-	workDir := filepath.Join(envDir, ".terraform-dns")
+// NewManager creates a new DNS manager.
+// Working directory is .plasma/platform/dns/<envName>/.
+// All generated files (HCL, state, provider cache) are ephemeral.
+func NewManager(envName string) (*Manager, error) {
+	workDir := filepath.Join(".plasma", "platform", "dns", envName)
 
 	if err := os.MkdirAll(workDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create dns terraform directory: %w", err)
+		return nil, fmt.Errorf("failed to create dns directory: %w", err)
 	}
 
-	execPath, err := findTerraformBinary()
+	execPath, err := pkgtofu.FindBinary()
 	if err != nil {
 		return nil, err
 	}
 
 	tf, err := tfexec.NewTerraform(workDir, execPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create terraform instance: %w", err)
+		return nil, fmt.Errorf("failed to create tofu instance: %w", err)
 	}
 
 	return &Manager{
@@ -66,24 +69,13 @@ func NewManager(envDir string) (*Manager, error) {
 	}, nil
 }
 
-// findTerraformBinary finds tofu or terraform in PATH
-func findTerraformBinary() (string, error) {
-	for _, name := range []string{"tofu", "terraform"} {
-		path, err := exec.LookPath(name)
-		if err == nil {
-			return path, nil
-		}
-	}
-	return "", fmt.Errorf("neither tofu nor terraform found in PATH")
-}
-
-// GenerateHCL generates DNS Terraform HCL for the given provider config
+// GenerateHCL generates DNS HCL for the given provider config
 func (m *Manager) GenerateHCL(config Config) error {
 	mainFile := filepath.Join(m.workDir, "main.tf")
 
 	tmplStr, ok := providerTemplates[config.Provider]
 	if !ok {
-		return fmt.Errorf("no DNS terraform template registered for provider %q", config.Provider)
+		return fmt.Errorf("no DNS HCL template registered for provider %q", config.Provider)
 	}
 
 	tmpl, err := template.New("main.tf").Parse(tmplStr)
@@ -103,18 +95,18 @@ func (m *Manager) GenerateHCL(config Config) error {
 	return nil
 }
 
-// Apply runs terraform init + apply for DNS
+// Apply runs tofu init + apply for DNS
 func (m *Manager) Apply(ctx context.Context) error {
 	if err := m.tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
-		return fmt.Errorf("terraform init failed: %w", err)
+		return fmt.Errorf("dns init failed: %w", err)
 	}
 	if err := m.tf.Apply(ctx); err != nil {
-		return fmt.Errorf("terraform apply failed: %w", err)
+		return fmt.Errorf("dns apply failed: %w", err)
 	}
 	return nil
 }
 
-// GetWorkDir returns the DNS terraform working directory
+// GetWorkDir returns the DNS working directory
 func (m *Manager) GetWorkDir() string {
 	return m.workDir
 }
