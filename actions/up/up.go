@@ -30,6 +30,18 @@ type UpOptions struct {
 	Persistent         action.InputParams
 }
 
+// UpResult is the structured result of platform:up.
+type UpResult struct {
+	Mode     string          `json:"mode"`
+	Pipeline *PipelineResult `json:"pipeline,omitempty"`
+}
+
+// PipelineResult holds CI pipeline details.
+type PipelineResult struct {
+	ID    int `json:"id"`
+	JobID int `json:"job_id"`
+}
+
 // Up implements the platform:up command
 type Up struct {
 	action.WithLogger
@@ -39,6 +51,13 @@ type Up struct {
 	M  action.Manager
 	G  *git.GitUp
 	CI *ci.ContinuousIntegration
+
+	result *UpResult
+}
+
+// Result returns the structured result for JSON output.
+func (u *Up) Result() any {
+	return u.result
 }
 
 // NewUp creates a new Up instance
@@ -82,6 +101,7 @@ func (u *Up) Run(ctx context.Context, environment, tags string, options UpOption
 		if err != nil {
 			return fmt.Errorf("deploy error: %w", err)
 		}
+		u.result = &UpResult{Mode: "image"}
 		return nil
 	}
 
@@ -155,6 +175,7 @@ func (u *Up) Run(ctx context.Context, environment, tags string, options UpOption
 			return fmt.Errorf("deploy error: %w", err)
 		}
 
+		u.result = &UpResult{Mode: "local"}
 	} else {
 		u.Term().Info().Println("Starting CI build (now default behavior)")
 
@@ -244,6 +265,14 @@ func (u *Up) Run(ctx context.Context, environment, tags string, options UpOption
 		err = u.CI.TriggerManualJob(gitlabDomain, gitlabAccessToken, projectID, targetJobID, pipelineID)
 		if err != nil {
 			return fmt.Errorf("failed to trigger manual job: %w", err)
+		}
+
+		u.result = &UpResult{
+			Mode: "ci",
+			Pipeline: &PipelineResult{
+				ID:    pipelineID,
+				JobID: targetJobID,
+			},
 		}
 	}
 	return nil

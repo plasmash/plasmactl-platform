@@ -1,3 +1,4 @@
+runtime: plugin
 action:
   title: Graph
   description: Query the platform dependency graph
@@ -106,5 +107,3 @@ action:
       - nodes
       - edges
       - stats
-
-runtime: plugin

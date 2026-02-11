@@ -35,6 +35,23 @@ action:
             findings:
               type: array
               description: List of findings
+              items:
+                type: object
+                properties:
+                  section:
+                    type: string
+                    description: Section identifier
+                  severity:
+                    type: string
+                    description: "Finding severity: error, warning, or info"
+                  message:
+                    type: string
+                    description: Finding message
+                  details:
+                    type: array
+                    description: Additional details
+                    items:
+                      type: string
       total_errors:
         type: integer
         description: Total number of errors found

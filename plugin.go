@@ -155,7 +155,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	// platform:up action (full workflow: compose → prepare → deploy)
 	upYaml, _ := actionYamlFS.ReadFile("actions/up/up.yaml")
 	upAction := action.NewFromYAML("platform:up", upYaml)
-	upAction.SetRuntime(action.NewFnRuntime(func(ctx context.Context, a *action.Action) error {
+	upAction.SetRuntime(action.NewFnRuntimeWithResult(func(ctx context.Context, a *action.Action) (any, error) {
 		input := a.Input()
 		env := input.Arg("environment").(string)
 		tags := input.Arg("tags").(string)
@@ -178,7 +178,8 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 
 		u := up.NewUp(a, p.k, p.m)
-		return u.Run(ctx, env, tags, options)
+		err := u.Run(ctx, env, tags, options)
+		return u.Result(), err
 	}))
 	actions = append(actions, upAction)
 

@@ -69,3 +69,19 @@ action:
       description: Log files conflicts during composition
       type: boolean
       default: false
+  result:
+    type: object
+    properties:
+      mode:
+        type: string
+        description: "Execution mode: local, ci, or image"
+      pipeline:
+        type: object
+        description: CI pipeline details (CI mode only)
+        properties:
+          id:
+            type: integer
+            description: Pipeline ID
+          job_id:
+            type: integer
+            description: Job ID

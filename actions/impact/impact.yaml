@@ -22,6 +22,34 @@ action:
       direct:
         type: array
         description: Direct impact entries
+        items:
+          type: object
+          properties:
+            category:
+              type: string
+              description: Impact category name
+            count:
+              type: integer
+              description: Number of items in this category
+            items:
+              type: array
+              description: List of affected items
+              items:
+                type: string
       transitive:
         type: array
         description: Transitive impact entries
+        items:
+          type: object
+          properties:
+            category:
+              type: string
+              description: Impact category name
+            count:
+              type: integer
+              description: Number of items in this category
+            items:
+              type: array
+              description: List of affected items
+              items:
+                type: string
