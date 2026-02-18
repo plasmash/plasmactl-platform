@@ -269,11 +269,16 @@ impl GraphBuilder {
                 None => continue,
             };
 
-            let component_name_str = format!("{}.{}.{}", layer, kind_plural_or_dir, parts[2]);
-            let subdir = parts[3];
+            // Strip legacy roles/ intermediate directory at position 2 if present
+            let (comp_part, subdir, file_depth) = if parts.len() > 3 && parts[2] == "roles" {
+                (parts[3], if parts.len() > 4 { parts[4] } else { "" }, 6usize)
+            } else {
+                (parts[2], parts[3], 5usize)
+            };
+            let component_name_str = format!("{}.{}.{}", layer, kind_plural_or_dir, comp_part);
 
             // meta/plasma.yaml → discover component
-            if depth == 5 && subdir == "meta" && filename == "plasma.yaml" {
+            if depth == file_depth && subdir == "meta" && filename == "plasma.yaml" {
                 if let Ok(content) = fs::read(path) {
                     if !memchr::memmem::find(&content, b"plasma:").is_some() {
                         continue;
@@ -301,7 +306,7 @@ impl GraphBuilder {
             }
 
             // defaults/main.yaml → collect for deferred processing
-            if depth == 5 && subdir == "defaults" && filename == "main.yaml" {
+            if depth == file_depth && subdir == "defaults" && filename == "main.yaml" {
                 if let Ok(content) = fs::read(path) {
                     let text = String::from_utf8_lossy(&content);
                     vars_ref_pending.extend(extract_var_refs(&text, &jinja_env));
@@ -327,7 +332,7 @@ impl GraphBuilder {
             }
 
             // tasks/{dependencies,main,configuration}.yaml
-            if depth == 5 && subdir == "tasks" && TASK_FILENAMES.contains(&filename) {
+            if depth == file_depth && subdir == "tasks" && TASK_FILENAMES.contains(&filename) {
                 if let Ok(content) = fs::read(path) {
                     // Check for include_role references
                     if memchr::memmem::find(&content, b"include_role").is_some() {
@@ -372,7 +377,7 @@ impl GraphBuilder {
             }
 
             // Scannable files (templates, configs) in deeper subdirs
-            if depth >= 5
+            if depth >= file_depth
                 && (filename.ends_with(".j2") || filename.ends_with(".yaml"))
                 && subdir != "meta"
                 && subdir != "defaults"
@@ -958,12 +963,12 @@ impl GraphBuilder {
             "model".to_string()
         };
 
-        // Add model node
+        // Add model node — version is always "head" (current filesystem state)
         self.graph.add_node(Node {
             name: model_name.clone(),
             kind: "model".to_string(),
-            versioned: false,
-            version: None,
+            versioned: true,
+            version: Some("head".to_string()),
             path: None,
             attrs: HashMap::new(),
         });
