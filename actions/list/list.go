@@ -101,11 +101,10 @@ func (l *List) Execute() error {
 		return nil
 	}
 
-	// Table output
+	// Flat output - one per line, scriptable
 	term := l.Term()
-	term.Printfln("%-10s %-20s %-10s %s", "NAME", "DOMAIN", "PROVIDER", "NODES")
 	for _, p := range platforms {
-		term.Printfln("%-10s %-20s %-10s %d", p.Name, p.Domain, p.MetalProvider, p.NodeCount)
+		term.Printfln("%s", p.Name)
 	}
 
 	return nil
