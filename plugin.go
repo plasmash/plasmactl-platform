@@ -33,6 +33,9 @@ import (
 //go:embed actions/*/*.yaml
 var actionYamlFS embed.FS
 
+//go:embed actions/graph/component.js
+var graphComponentJS []byte
+
 func init() {
 	launchr.RegisterPlugin(&Plugin{})
 }
@@ -148,6 +151,16 @@ func (p *Plugin) initTofuBinary() error {
 	return nil
 }
 
+// ActionComponents implements web server's ActionComponentProvider interface.
+// Returns pre-compiled JS components keyed by action ID.
+func (p *Plugin) ActionComponents() map[string][]byte {
+	m := make(map[string][]byte)
+	if len(graphComponentJS) > 0 {
+		m["platform:graph"] = graphComponentJS
+	}
+	return m
+}
+
 // DiscoverActions implements [launchr.ActionDiscoveryPlugin] interface.
 func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	var actions []*action.Action
@@ -213,11 +226,8 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	listYaml, _ := actionYamlFS.ReadFile("actions/list/list.yaml")
 	listAction := action.NewFromYAML("platform:list", listYaml)
 	listAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
-		input := a.Input()
 		log, term := getLoggerTerm(a)
-		l := &list.List{
-			Format: input.Opt("output").(string),
-		}
+		l := &list.List{}
 		l.SetLogger(log)
 		l.SetTerm(term)
 		err := l.Execute()
@@ -381,7 +391,13 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		input := a.Input()
 		query := input.Arg("query").(string)
 		reverse := input.Opt("reverse").(bool)
-		depth := input.Opt("depth").(int)
+		var depth int
+		switch v := input.Opt("depth").(type) {
+		case int:
+			depth = v
+		case float64:
+			depth = int(v)
+		}
 		tree := input.Opt("tree").(bool)
 		format := input.Opt("format").(string)
 		composeDir := input.Opt("compose-dir").(string)
@@ -410,7 +426,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		cmd := exec.Command(binPath, args...)
 		cmd.Stderr = a.Input().Streams().Err()
 
-		if jsonOutput {
+		if format == "json" {
 			// Capture output and return structured result for --json/web
 			out, err := cmd.Output()
 			if err != nil {

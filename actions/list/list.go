@@ -20,8 +20,6 @@ type List struct {
 	action.WithLogger
 	action.WithTerm
 
-	Format string
-
 	result *ListResult
 }
 
@@ -32,6 +30,9 @@ func (l *List) Result() any {
 
 func (l *List) Execute() error {
 	instDir := "inst"
+
+	// Initialize result early so --json always returns an object, never null
+	l.result = &ListResult{Platforms: []schema.PlatformInfo{}}
 
 	// Check if inst directory exists
 	if _, err := os.Stat(instDir); os.IsNotExist(err) {

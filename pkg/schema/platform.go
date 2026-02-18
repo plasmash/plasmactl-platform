@@ -128,9 +128,9 @@ func NewPlatform(name, metalProvider, dnsProvider, domain string) *Platform {
 
 // PlatformInfo represents summarized platform information for listing
 type PlatformInfo struct {
-	Name          string `yaml:"name"`
-	Domain        string `yaml:"domain"`
-	MetalProvider string `yaml:"metal_provider"`
-	DNSProvider   string `yaml:"dns_provider"`
-	NodeCount     int    `yaml:"node_count"`
+	Name          string `yaml:"name"           json:"name"`
+	Domain        string `yaml:"domain"         json:"domain"`
+	MetalProvider string `yaml:"metal_provider" json:"metal_provider"`
+	DNSProvider   string `yaml:"dns_provider"   json:"dns_provider"`
+	NodeCount     int    `yaml:"node_count"     json:"node_count"`
 }

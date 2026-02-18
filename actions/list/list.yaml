@@ -1,14 +1,8 @@
 runtime: plugin
 action:
   title: List Platforms
+  icon: view_list
   description: "List all platforms in the current repository"
-  options:
-    - name: output
-      shorthand: o
-      title: Output Format
-      description: Output format (json, yaml). Default is table.
-      type: string
-      default: ""
   result:
     type: object
     properties:
@@ -19,7 +13,16 @@ action:
           properties:
             name:
               type: string
+              description: Platform name
             domain:
               type: string
-            provider:
+              description: DNS domain
+            metal_provider:
               type: string
+              description: Infrastructure provider (scaleway, hetzner, aws, etc.)
+            dns_provider:
+              type: string
+              description: DNS provider (ovh, cloudflare, gandi, etc.)
+            node_count:
+              type: integer
+              description: Number of nodes
