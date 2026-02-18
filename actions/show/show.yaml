@@ -1,19 +1,13 @@
 runtime: plugin
 action:
   title: Show Platform
+  icon: visibility
   description: "Show details of a platform including configuration and nodes"
   arguments:
     - name: name
       title: Name
       description: The name of the platform to show
       required: true
-  options:
-    - name: output
-      shorthand: o
-      title: Output Format
-      description: Output format (json, yaml). Default is human-readable.
-      type: string
-      default: ""
   result:
     type: object
     properties:

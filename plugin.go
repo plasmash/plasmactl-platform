@@ -242,8 +242,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		s := &show.Show{
-			Name:   input.Arg("name").(string),
-			Format: input.Opt("output").(string),
+			Name: input.Arg("name").(string),
 		}
 		s.SetLogger(log)
 		s.SetTerm(term)

@@ -30,8 +30,7 @@ type Show struct {
 	action.WithLogger
 	action.WithTerm
 
-	Name   string
-	Format string
+	Name string
 
 	result *ShowResult
 }
