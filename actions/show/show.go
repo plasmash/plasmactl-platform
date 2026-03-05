@@ -79,6 +79,11 @@ func (s *Show) Execute() error {
 		Configured: dnsConfigured,
 	}
 
+	// Sanitize secrets before exposing in structured output.
+	platform.Infrastructure.API.Token = ""
+	platform.DNS.API.Token = ""
+	platform.DNS.DKIMKey = ""
+
 	// Build result
 	s.result = &ShowResult{
 		Platform: platform,
