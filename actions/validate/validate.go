@@ -182,12 +182,12 @@ func (v *Validate) Execute() error {
 					Value:  "no machine specified",
 				})
 				hasErrors = true
-			} else if len(pool.Chassis) == 0 {
-				v.Term().Error().Printfln("  ✗ No chassis sections for pool %s", name)
+			} else if len(pool.Zones) == 0 {
+				v.Term().Error().Printfln("  ✗ No zones for pool %s", name)
 				v.result.Checks = append(v.result.Checks, ValidationCheck{
 					Name:   fmt.Sprintf("pool_%s", name),
 					Status: "fail",
-					Value:  "no chassis sections",
+					Value:  "no zones",
 				})
 				hasErrors = true
 			} else {

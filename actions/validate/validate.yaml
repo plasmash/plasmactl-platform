@@ -1,6 +1,7 @@
 runtime: plugin
 action:
   title: Validate Platform
+  icon: verified
   description: "Validate platform configuration including DNS propagation and mail authentication"
   arguments:
     - name: name

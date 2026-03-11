@@ -73,16 +73,16 @@ type DataBusConfig struct {
 	BrokerCount int    `yaml:"broker_count,omitempty" json:"broker_count,omitempty"`
 }
 
-// Pool defines a group of nodes serving co-located chassis sections
+// Pool defines a group of nodes serving co-located zones
 type Pool struct {
-	Chassis []string `yaml:"chassis" json:"chassis"`
+	Zones   []string `yaml:"zones"   json:"zones"`
 	Machine string   `yaml:"machine" json:"machine"`
 	Count   int      `yaml:"count"   json:"count"`
 }
 
 // PlatformDefaults defines default values for nodes
 type PlatformDefaults struct {
-	Chassis      string    `yaml:"chassis,omitempty"      json:"chassis,omitempty"`
+	Zone         string    `yaml:"zone,omitempty"         json:"zone,omitempty"`
 	Capabilities []string  `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
 	Resources    Resources `yaml:"resources,omitempty"    json:"resources,omitempty"`
 }

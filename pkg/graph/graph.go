@@ -19,8 +19,8 @@ import (
 type PlatformNode struct {
 	uid     int64
 	Name    string // e.g. "interaction.applications.dashboards"
-	Type    string // "component", "chassis", "variable", "node", "platform", "model", "package"
-	Kind    string // "application", "service", "chassis", etc.
+	Type    string // "component", "zone", "variable", "node", "platform", "model", "package"
+	Kind    string // "application", "service", "zone", etc.
 	Layer   string // "interaction", "foundation", etc. (may be empty)
 	Version string // git commit hash (may be empty)
 	Path    string // filesystem path (may be empty)
@@ -146,7 +146,7 @@ func (g *PlatformGraph) Node(name string) *PlatformNode {
 	return g.byName[name]
 }
 
-// NodesByKind returns all nodes with the given kind (e.g. "application", "chassis").
+// NodesByKind returns all nodes with the given kind (e.g. "application", "zone").
 func (g *PlatformGraph) NodesByKind(kind string) []*PlatformNode {
 	return g.byKind[kind]
 }

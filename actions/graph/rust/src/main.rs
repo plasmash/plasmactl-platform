@@ -15,7 +15,7 @@ use render::{MermaidRenderer, TreeRenderer};
 #[derive(Parser)]
 #[command(name = "platform-graph", about = "Query the platform dependency graph")]
 struct Cli {
-    /// Node to query (component, chassis, variable, node). Empty for full graph.
+    /// Node to query (component, zone, variable, node). Empty for full graph.
     #[arg(default_value = "")]
     query: String,
 

@@ -1,7 +1,8 @@
 runtime: plugin
 action:
   title: Size Platform
-  description: "List and manage pool sizing that maps chassis sections to hardware"
+  icon: tune
+  description: "List and manage pool sizing that maps zones to hardware"
   arguments:
     - name: name
       title: Name
@@ -15,7 +16,7 @@ action:
       default: false
     - name: add
       title: Add
-      description: "Add a pool (requires --chassis, --machine, --count)"
+      description: "Add a pool (requires --zone, --machine, --count)"
       type: string
       default: ""
     - name: remove
@@ -23,10 +24,10 @@ action:
       description: "Remove a pool by name"
       type: string
       default: ""
-    - name: chassis
-      shorthand: c
-      title: Chassis
-      description: "Chassis sections for the pool (can be specified multiple times)"
+    - name: zone
+      shorthand: z
+      title: Zone
+      description: "Zones for the pool (can be specified multiple times)"
       type: array
       default: []
     - name: machine
@@ -51,7 +52,7 @@ action:
           properties:
             name:
               type: string
-            chassis:
+            zones:
               type: array
               items:
                 type: string

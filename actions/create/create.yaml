@@ -1,6 +1,7 @@
 runtime: plugin
 action:
   title: Create Platform
+  icon: add_circle
   description: "Create a new platform scaffold with platform.yaml and nodes/ directory"
   arguments:
     - name: name

@@ -1,6 +1,7 @@
 runtime: plugin
 action:
   title: Deploy Platform
+  icon: rocket_launch
   description: Deploy Ansible resources to target cluster
   arguments:
     - name: environment

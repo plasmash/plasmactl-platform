@@ -189,6 +189,16 @@ graph:
 	@cp $(GRAPH_RUST_DIR)/target/release/platform-graph $(GRAPH_OUTPUT_DIR)/platform-graph-$(shell go env GOOS)-$(shell go env GOARCH)
 	$(call print_success,"platform-graph binary built for current platform!")
 
+# Build graph web component via Docker (no Node.js needed on host)
+.PHONY: graph-component
+graph-component:
+	$(call print_step,"Building graph web component via Docker...")
+	@docker build -t plasmactl-graph-component-builder -f $(GRAPH_OUTPUT_DIR)/Dockerfile.component $(GRAPH_OUTPUT_DIR)
+	@cid=$$(docker create plasmactl-graph-component-builder) && \
+		docker cp "$$cid:/component.js" "$(GRAPH_OUTPUT_DIR)/component.js" && \
+		docker rm "$$cid" > /dev/null
+	$(call print_success,"Graph web component built!")
+
 # Build graph binaries for all platforms via Docker (no Rust needed on host)
 .PHONY: graph-all
 graph-all:
@@ -226,8 +236,9 @@ help:
 	@echo "  $(BOLD)$(GREEN)build$(RESET)       🔨 Build launchr binary"
 	@echo "  $(BOLD)$(GREEN)install$(RESET)     🚀 Install launchr to GOPATH"
 	@echo "  $(BOLD)$(GREEN)lint$(RESET)        🔍 Run linters with auto-fix"
-	@echo "  $(BOLD)$(GREEN)graph$(RESET)       🦀 Build graph binary for current platform (needs Rust)"
-	@echo "  $(BOLD)$(GREEN)graph-all$(RESET)   🐳 Build graph binaries for all platforms (needs Docker)"
+	@echo "  $(BOLD)$(GREEN)graph$(RESET)            🦀 Build graph binary for current platform (needs Rust)"
+	@echo "  $(BOLD)$(GREEN)graph-all$(RESET)        🐳 Build graph binaries for all platforms (needs Docker)"
+	@echo "  $(BOLD)$(GREEN)graph-component$(RESET)  🌐 Build graph web component (needs Docker)"
 	@echo "  $(BOLD)$(GREEN)clean$(RESET)       🧹 Clean build artifacts"
 	@echo "  $(BOLD)$(GREEN)help$(RESET)        ❓ Show this help message"
 	@echo ""

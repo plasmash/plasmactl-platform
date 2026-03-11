@@ -1,11 +1,12 @@
 runtime: plugin
 action:
   title: Check Platform
-  description: "Run comprehensive graph-powered validations across all platform aspects: components, model, chassis, nodes, variables, and flows"
+  icon: check_circle
+  description: "Run comprehensive graph-powered validations across all platform aspects: components, model, zones, nodes, variables, and flows"
   options:
     - name: section
       title: Section
-      description: "Run only a specific validation section (components, model, chassis, nodes, variables, flows)"
+      description: "Run only a specific validation section (components, model, zones, nodes, variables, flows)"
       type: string
       default: ""
   result:
@@ -19,7 +20,7 @@ action:
           properties:
             id:
               type: string
-              description: Section identifier for layout switching (components, model, chassis, nodes, variables, flows)
+              description: Section identifier for layout switching (components, model, zones, nodes, variables, flows)
             name:
               type: string
               description: Human-readable section name

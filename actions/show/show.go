@@ -119,7 +119,7 @@ func (s *Show) Execute() error {
 	if len(platform.Pools) > 0 {
 		term.Printfln("Pools:")
 		for name, pool := range platform.Pools {
-			term.Printfln("  - %s: %s x%d (%s)", name, pool.Machine, pool.Count, strings.Join(pool.Chassis, ", "))
+			term.Printfln("  - %s: %s x%d (%s)", name, pool.Machine, pool.Count, strings.Join(pool.Zones, ", "))
 		}
 	}
 

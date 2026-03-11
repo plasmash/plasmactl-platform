@@ -1,11 +1,12 @@
 runtime: plugin
 action:
   title: Graph
+  icon: account_tree
   description: Query the platform dependency graph
   arguments:
     - name: query
       title: Query
-      description: Node to query (component, chassis, variable, node). Empty for full graph.
+      description: Node to query (component, zone, variable, node). Empty for full graph.
       type: string
       default: ""
   options:
@@ -70,7 +71,7 @@ action:
               description: Node identifier
             type:
               type: string
-              description: Node type (component, chassis, variable, node)
+              description: Node type (component, zone, variable, node)
             kind:
               type: string
               description: Component kind if applicable

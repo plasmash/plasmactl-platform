@@ -1,6 +1,7 @@
 runtime: plugin
 action:
   title: Up
+  icon: publish
   description: "Full workflow: bump → compose → prepare → deploy (local), or trigger CI pipeline"
   arguments:
     - name: environment

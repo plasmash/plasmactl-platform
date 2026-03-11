@@ -61,13 +61,13 @@ func (c *Check) Execute() error {
 	sections := map[string]func(*graph.PlatformGraph) SectionResult{
 		"components": c.checkComponents,
 		"model":      c.checkModel,
-		"chassis":    c.checkChassis,
+		"zones":      c.checkZones,
 		"nodes":      c.checkNodes,
 		"variables":  c.checkVariables,
 		"flows":      c.checkFlows,
 	}
 
-	order := []string{"components", "model", "chassis", "nodes", "variables", "flows"}
+	order := []string{"components", "model", "zones", "nodes", "variables", "flows"}
 
 	for _, name := range order {
 		if c.Section != "" && c.Section != name {
@@ -110,7 +110,7 @@ func (c *Check) checkComponents(g *graph.PlatformGraph) SectionResult {
 		sr.Errors++
 	}
 
-	// 2. Orphan components: components not attached to any chassis and not required by any attached component
+	// 2. Orphan components: components not attached to any zone and not required by any attached component
 	components := g.NodesByType("component")
 	attachedComponents := make(map[string]bool)
 	for _, comp := range components {
@@ -309,15 +309,15 @@ func (c *Check) checkModel(g *graph.PlatformGraph) SectionResult {
 	return sr
 }
 
-// checkChassis validates chassis coverage.
-func (c *Check) checkChassis(g *graph.PlatformGraph) SectionResult {
-	sr := SectionResult{ID: "chassis", Name: "Chassis Coverage"}
+// checkZones validates zone coverage.
+func (c *Check) checkZones(g *graph.PlatformGraph) SectionResult {
+	sr := SectionResult{ID: "zones", Name: "Zone Coverage"}
 
-	chassisNodes := g.NodesByKind("chassis")
+	zoneNodes := g.NodesByKind("zone")
 
-	// 1. Empty chassis paths: paths with zero node allocations
+	// 1. Empty zones: paths with zero node allocations
 	var emptyPaths []string
-	for _, ch := range chassisNodes {
+	for _, ch := range zoneNodes {
 		nodes := g.EdgesTo(ch.Name, "allocates")
 		if len(nodes) == 0 {
 			emptyPaths = append(emptyPaths, ch.Name)
@@ -328,9 +328,9 @@ func (c *Check) checkChassis(g *graph.PlatformGraph) SectionResult {
 		sr.Passed++
 	} else {
 		sr.Findings = append(sr.Findings, Finding{
-			Section:  "chassis",
+			Section:  "zones",
 			Severity: "error",
-			Message:  fmt.Sprintf("%d chassis path(s) with zero nodes", len(emptyPaths)),
+			Message:  fmt.Sprintf("%d zone(s) with zero nodes", len(emptyPaths)),
 			Details:  emptyPaths,
 		})
 		sr.Errors++
@@ -338,7 +338,7 @@ func (c *Check) checkChassis(g *graph.PlatformGraph) SectionResult {
 
 	// 2. Unattached paths: paths with zero component attachments
 	var unattachedPaths []string
-	for _, ch := range chassisNodes {
+	for _, ch := range zoneNodes {
 		attachments := g.EdgesFrom(ch.Name, "distributes")
 		if len(attachments) == 0 {
 			unattachedPaths = append(unattachedPaths, ch.Name)
@@ -349,17 +349,17 @@ func (c *Check) checkChassis(g *graph.PlatformGraph) SectionResult {
 		sr.Passed++
 	} else {
 		sr.Findings = append(sr.Findings, Finding{
-			Section:  "chassis",
+			Section:  "zones",
 			Severity: "warning",
-			Message:  fmt.Sprintf("%d chassis path(s) with zero component attachments", len(unattachedPaths)),
+			Message:  fmt.Sprintf("%d zone(s) with zero component attachments", len(unattachedPaths)),
 			Details:  unattachedPaths,
 		})
 		sr.Warnings++
 	}
 
-	// 3. Single-node chassis paths (no redundancy)
+	// 3. Single-node zones (no redundancy)
 	var singleNode []string
-	for _, ch := range chassisNodes {
+	for _, ch := range zoneNodes {
 		nodes := g.EdgesTo(ch.Name, "allocates")
 		attachments := g.EdgesFrom(ch.Name, "distributes")
 		if len(nodes) == 1 && len(attachments) > 0 {
@@ -371,9 +371,9 @@ func (c *Check) checkChassis(g *graph.PlatformGraph) SectionResult {
 		sr.Passed++
 	} else {
 		sr.Findings = append(sr.Findings, Finding{
-			Section:  "chassis",
+			Section:  "zones",
 			Severity: "warning",
-			Message:  fmt.Sprintf("%d single-node chassis path(s) (no redundancy)", len(singleNode)),
+			Message:  fmt.Sprintf("%d single-node zone(s) (no redundancy)", len(singleNode)),
 			Details:  singleNode,
 		})
 		sr.Warnings++
@@ -388,7 +388,7 @@ func (c *Check) checkNodes(g *graph.PlatformGraph) SectionResult {
 
 	infraNodes := g.NodesByKind("node")
 
-	// 1. Nodes with no chassis allocations
+	// 1. Nodes with no zone allocations
 	var unallocated []string
 	for _, n := range infraNodes {
 		allocations := g.EdgesFrom(n.Name, "allocates")
@@ -403,17 +403,17 @@ func (c *Check) checkNodes(g *graph.PlatformGraph) SectionResult {
 		sr.Findings = append(sr.Findings, Finding{
 			Section:  "nodes",
 			Severity: "warning",
-			Message:  fmt.Sprintf("%d node(s) with no chassis allocations", len(unallocated)),
+			Message:  fmt.Sprintf("%d node(s) with no zone allocations", len(unallocated)),
 			Details:  unallocated,
 		})
 		sr.Warnings++
 	}
 
-	// 2. Single points of failure: chassis paths served by exactly one node
+	// 2. Single points of failure: zones served by exactly one node
 	//    and that node is the only one serving components
-	chassisNodes := g.NodesByKind("chassis")
+	zoneNodes := g.NodesByKind("zone")
 	var spof []string
-	for _, ch := range chassisNodes {
+	for _, ch := range zoneNodes {
 		members := g.EdgesTo(ch.Name, "allocates")
 		attachments := g.EdgesFrom(ch.Name, "distributes")
 		if len(members) == 1 && len(attachments) > 0 {

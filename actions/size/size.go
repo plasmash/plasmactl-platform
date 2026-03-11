@@ -23,7 +23,7 @@ type SizeResult struct {
 // PoolInfo represents a pool in structured output
 type PoolInfo struct {
 	Name       string   `json:"name"`
-	Chassis    []string `json:"chassis"`
+	Zones      []string `json:"zones"`
 	Machine    string   `json:"machine"`
 	Count      int      `json:"count"`
 	Components []string `json:"components,omitempty"`
@@ -38,7 +38,7 @@ type Size struct {
 	Suggest bool
 	Add     string
 	Remove  string
-	Chassis []string
+	Zones []string
 	Machine string
 	Count   int
 
@@ -104,16 +104,16 @@ func (s *Size) list(platform schema.Platform) error {
 		pool := platform.Pools[name]
 		info := PoolInfo{
 			Name:    name,
-			Chassis: pool.Chassis,
+			Zones: pool.Zones,
 			Machine: pool.Machine,
 			Count:   pool.Count,
 		}
 
 		s.Term().Info().Printfln("Pool %q (%s x%d):", name, pool.Machine, pool.Count)
-		for _, chassis := range pool.Chassis {
-			s.Term().Printfln("  %s", chassis)
+		for _, zone := range pool.Zones {
+			s.Term().Printfln("  %s", zone)
 			if g != nil {
-				for _, e := range g.EdgesFrom(chassis, "distributes") {
+				for _, e := range g.EdgesFrom(zone, "distributes") {
 					s.Term().Printfln("    → %s (%s)", e.To().Name, e.To().Kind)
 					info.Components = append(info.Components, e.To().Name)
 				}
@@ -137,14 +137,14 @@ func (s *Size) suggest(platformFile string, platform *schema.Platform) error {
 	s.Term().Info().Println("Analyzing platform graph...")
 	s.Term().Println()
 
-	chassisNodes := g.NodesByKind("chassis")
-	if len(chassisNodes) == 0 {
-		return fmt.Errorf("no chassis sections found in platform graph")
+	zoneNodes := g.NodesByKind("zone")
+	if len(zoneNodes) == 0 {
+		return fmt.Errorf("no zones found in platform graph")
 	}
 
-	// Group chassis by layer (second path segment)
+	// Group zones by layer (second path segment)
 	groups := make(map[string][]string)
-	for _, cn := range chassisNodes {
+	for _, cn := range zoneNodes {
 		segments := strings.Split(cn.Name, ".")
 		var groupKey string
 		if len(segments) >= 3 {
@@ -164,16 +164,16 @@ func (s *Size) suggest(platformFile string, platform *schema.Platform) error {
 	reader := bufio.NewReader(os.Stdin)
 	pools := make(map[string]schema.Pool)
 
-	s.Term().Info().Println("Suggested pools based on chassis structure:")
+	s.Term().Info().Println("Suggested pools based on zone structure:")
 	s.Term().Info().Println("For each pool, enter a machine type and count, or 'skip' to exclude.")
 	s.Term().Println()
 
 	for _, groupName := range groupNames {
-		chassisList := groups[groupName]
-		sort.Strings(chassisList)
+		zoneList := groups[groupName]
+		sort.Strings(zoneList)
 
-		s.Term().Info().Printfln("Pool %q (%d chassis sections):", groupName, len(chassisList))
-		for _, c := range chassisList {
+		s.Term().Info().Printfln("Pool %q (%d zones):", groupName, len(zoneList))
+		for _, c := range zoneList {
 			s.Term().Printfln("  %s", c)
 			for _, e := range g.EdgesFrom(c, "distributes") {
 				s.Term().Printfln("    → %s (%s)", e.To().Name, e.To().Kind)
@@ -202,7 +202,7 @@ func (s *Size) suggest(platformFile string, platform *schema.Platform) error {
 		}
 
 		pools[groupName] = schema.Pool{
-			Chassis: chassisList,
+			Zones: zoneList,
 			Machine: machine,
 			Count:   count,
 		}
@@ -220,7 +220,7 @@ func (s *Size) suggest(platformFile string, platform *schema.Platform) error {
 	s.Term().Info().Println("Pool summary:")
 	for _, name := range sortedKeys(pools) {
 		pool := pools[name]
-		s.Term().Info().Printfln("  %s: %s x%d (%d chassis sections)", name, pool.Machine, pool.Count, len(pool.Chassis))
+		s.Term().Info().Printfln("  %s: %s x%d (%d zones)", name, pool.Machine, pool.Count, len(pool.Zones))
 	}
 	s.Term().Println()
 
@@ -244,8 +244,8 @@ func (s *Size) addPool(platformFile string, platform *schema.Platform) error {
 	if s.Count <= 0 {
 		return fmt.Errorf("--count must be greater than 0")
 	}
-	if len(s.Chassis) == 0 {
-		return fmt.Errorf("--chassis is required when adding a pool")
+	if len(s.Zones) == 0 {
+		return fmt.Errorf("--zone is required when adding a pool")
 	}
 
 	if platform.Pools == nil {
@@ -257,7 +257,7 @@ func (s *Size) addPool(platformFile string, platform *schema.Platform) error {
 	}
 
 	platform.Pools[s.Add] = schema.Pool{
-		Chassis: s.Chassis,
+		Zones: s.Zones,
 		Machine: s.Machine,
 		Count:   s.Count,
 	}
@@ -266,13 +266,13 @@ func (s *Size) addPool(platformFile string, platform *schema.Platform) error {
 		return err
 	}
 
-	s.Term().Success().Printfln("Added pool %q (%s x%d, %d chassis sections)", s.Add, s.Machine, s.Count, len(s.Chassis))
+	s.Term().Success().Printfln("Added pool %q (%s x%d, %d zones)", s.Add, s.Machine, s.Count, len(s.Zones))
 
 	s.result = &SizeResult{}
 	for name, pool := range platform.Pools {
 		s.result.Pools = append(s.result.Pools, PoolInfo{
 			Name:    name,
-			Chassis: pool.Chassis,
+			Zones: pool.Zones,
 			Machine: pool.Machine,
 			Count:   pool.Count,
 		})
@@ -299,7 +299,7 @@ func (s *Size) removePool(platformFile string, platform *schema.Platform) error 
 	for name, pool := range platform.Pools {
 		s.result.Pools = append(s.result.Pools, PoolInfo{
 			Name:    name,
-			Chassis: pool.Chassis,
+			Zones: pool.Zones,
 			Machine: pool.Machine,
 			Count:   pool.Count,
 		})
@@ -323,7 +323,7 @@ func (s *Size) writePools(platformFile string, platform *schema.Platform, pools 
 	for name, pool := range pools {
 		s.result.Pools = append(s.result.Pools, PoolInfo{
 			Name:    name,
-			Chassis: pool.Chassis,
+			Zones: pool.Zones,
 			Machine: pool.Machine,
 			Count:   pool.Count,
 		})

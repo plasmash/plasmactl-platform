@@ -318,7 +318,7 @@ fn initialize_positions(graph: &DiGraph<Node, String>) -> Vec<(f64, f64)> {
         ("platform", 1000.0),   // Materialization
         ("model", 2000.0),      // Composition
         ("package", 2500.0),    // Composition (sub)
-        ("chassis", 3000.0),    // Distribution
+        ("zone", 3000.0),    // Distribution
         ("agent", 4000.0),      // Orchestration (top path)
         ("application", 4000.0),// Orchestration (bottom path)
         ("skill", 5000.0),      // Configuration (top path)

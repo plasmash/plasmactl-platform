@@ -232,7 +232,7 @@ fn mermaid_shape(kind: &str) -> (&'static str, &'static str) {
         "agent" => ("([", "])"),
         "library" => ("[(", ")]"),
         "entity" => ("[/", "/]"),
-        "chassis" => ("[[", "]]"),
+        "zone" => ("[[", "]]"),
         "variable" => ("(", ")"),
         _ => ("[", "]"),
     }

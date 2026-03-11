@@ -62,8 +62,8 @@ func (imp *Impact) Execute() error {
 		imp.analyzeComponent(g, node)
 	case "variable":
 		imp.analyzeVariable(g, node)
-	case "chassis":
-		imp.analyzeChassis(g, node)
+	case "zone":
+		imp.analyzeZone(g, node)
 	case "node":
 		imp.analyzeNode(g, node)
 	case "package":
@@ -102,21 +102,21 @@ func (imp *Impact) analyzeComponent(g *graph.PlatformGraph, node *graph.Platform
 		Items:    vars,
 	})
 
-	// Direct: chassis attachment
-	var chassis []string
+	// Direct: zone attachment
+	var zones []string
 	for _, e := range g.EdgesTo(node.Name, "distributes") {
-		chassis = append(chassis, e.From().Name)
+		zones = append(zones, e.From().Name)
 	}
-	sort.Strings(chassis)
+	sort.Strings(zones)
 	imp.result.Direct = append(imp.result.Direct, ImpactEntry{
-		Category: "Attached to chassis",
-		Count:    len(chassis),
-		Items:    chassis,
+		Category: "Attached to zone",
+		Count:    len(zones),
+		Items:    zones,
 	})
 
-	// Direct: nodes serving this component's chassis
+	// Direct: nodes serving this component's zone
 	nodeSet := make(map[string]bool)
-	for _, ch := range chassis {
+	for _, ch := range zones {
 		for _, e := range g.EdgesTo(ch, "allocates") {
 			nodeSet[e.From().Name] = true
 		}
@@ -147,25 +147,25 @@ func (imp *Impact) analyzeComponent(g *graph.PlatformGraph, node *graph.Platform
 		Items:    transitiveComps,
 	})
 
-	// Transitive: all chassis paths affected
-	transitiveChassisSet := make(map[string]bool)
+	// Transitive: all zones affected
+	transitiveZoneSet := make(map[string]bool)
 	for _, comp := range transitiveComps {
 		for _, e := range g.EdgesTo(comp, "distributes") {
-			transitiveChassisSet[e.From().Name] = true
+			transitiveZoneSet[e.From().Name] = true
 		}
 	}
-	for _, ch := range chassis {
-		transitiveChassisSet[ch] = true
+	for _, z := range zones {
+		transitiveZoneSet[z] = true
 	}
-	var transitiveChassis []string
-	for ch := range transitiveChassisSet {
-		transitiveChassis = append(transitiveChassis, ch)
+	var transitiveZones []string
+	for z := range transitiveZoneSet {
+		transitiveZones = append(transitiveZones, z)
 	}
-	sort.Strings(transitiveChassis)
+	sort.Strings(transitiveZones)
 	imp.result.Transitive = append(imp.result.Transitive, ImpactEntry{
-		Category: "Total affected chassis paths",
-		Count:    len(transitiveChassis),
-		Items:    transitiveChassis,
+		Category: "Total affected zones",
+		Count:    len(transitiveZones),
+		Items:    transitiveZones,
 	})
 }
 
@@ -206,28 +206,28 @@ func (imp *Impact) analyzeVariable(g *graph.PlatformGraph, node *graph.PlatformN
 		Items:    overriders,
 	})
 
-	// Transitive: chassis paths and nodes affected by consuming components
-	chassisSet := make(map[string]bool)
+	// Transitive: zones and nodes affected by consuming components
+	zoneSet := make(map[string]bool)
 	nodeSet := make(map[string]bool)
 	for _, comp := range consumers {
 		for _, e := range g.EdgesTo(comp, "distributes") {
-			ch := e.From().Name
-			chassisSet[ch] = true
-			for _, ne := range g.EdgesTo(ch, "allocates") {
+			z := e.From().Name
+			zoneSet[z] = true
+			for _, ne := range g.EdgesTo(z, "allocates") {
 				nodeSet[ne.From().Name] = true
 			}
 		}
 	}
 
-	var chassisList []string
-	for ch := range chassisSet {
-		chassisList = append(chassisList, ch)
+	var zoneList []string
+	for z := range zoneSet {
+		zoneList = append(zoneList, z)
 	}
-	sort.Strings(chassisList)
+	sort.Strings(zoneList)
 	imp.result.Transitive = append(imp.result.Transitive, ImpactEntry{
-		Category: "Affected chassis paths",
-		Count:    len(chassisList),
-		Items:    chassisList,
+		Category: "Affected zones",
+		Count:    len(zoneList),
+		Items:    zoneList,
 	})
 
 	var nodeList []string
@@ -242,7 +242,7 @@ func (imp *Impact) analyzeVariable(g *graph.PlatformGraph, node *graph.PlatformN
 	})
 }
 
-func (imp *Impact) analyzeChassis(g *graph.PlatformGraph, node *graph.PlatformNode) {
+func (imp *Impact) analyzeZone(g *graph.PlatformGraph, node *graph.PlatformNode) {
 	// Direct: components attached
 	var components []string
 	for _, e := range g.EdgesFrom(node.Name, "distributes") {
@@ -290,37 +290,37 @@ func (imp *Impact) analyzeChassis(g *graph.PlatformGraph, node *graph.PlatformNo
 }
 
 func (imp *Impact) analyzeNode(g *graph.PlatformGraph, node *graph.PlatformNode) {
-	// Direct: chassis paths this node serves
-	var chassisPaths []string
+	// Direct: zones this node serves
+	var zonePaths []string
 	for _, e := range g.EdgesFrom(node.Name, "allocates") {
-		chassisPaths = append(chassisPaths, e.To().Name)
+		zonePaths = append(zonePaths, e.To().Name)
 	}
-	sort.Strings(chassisPaths)
+	sort.Strings(zonePaths)
 	imp.result.Direct = append(imp.result.Direct, ImpactEntry{
-		Category: "Chassis paths served",
-		Count:    len(chassisPaths),
-		Items:    chassisPaths,
+		Category: "Zones served",
+		Count:    len(zonePaths),
+		Items:    zonePaths,
 	})
 
-	// Direct: chassis paths that would have zero nodes if this node is removed
+	// Direct: zones that would have zero nodes if this node is removed
 	var zeroNodePaths []string
-	for _, chPath := range chassisPaths {
-		members := g.EdgesTo(chPath, "allocates")
+	for _, zPath := range zonePaths {
+		members := g.EdgesTo(zPath, "allocates")
 		if len(members) == 1 {
-			zeroNodePaths = append(zeroNodePaths, chPath)
+			zeroNodePaths = append(zeroNodePaths, zPath)
 		}
 	}
 	sort.Strings(zeroNodePaths)
 	imp.result.Direct = append(imp.result.Direct, ImpactEntry{
-		Category: "Chassis paths left with zero nodes if removed",
+		Category: "Zones left with zero nodes if removed",
 		Count:    len(zeroNodePaths),
 		Items:    zeroNodePaths,
 	})
 
 	// Transitive: components that would lose infrastructure
 	componentSet := make(map[string]bool)
-	for _, chPath := range zeroNodePaths {
-		for _, e := range g.EdgesFrom(chPath, "distributes") {
+	for _, zPath := range zeroNodePaths {
+		for _, e := range g.EdgesFrom(zPath, "distributes") {
 			componentSet[e.To().Name] = true
 		}
 	}

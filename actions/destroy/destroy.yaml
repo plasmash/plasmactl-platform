@@ -1,6 +1,7 @@
 runtime: plugin
 action:
   title: Destroy Platform
+  icon: delete_forever
   description: "Destroy a platform and all its resources (requires confirmation)"
   arguments:
     - name: name

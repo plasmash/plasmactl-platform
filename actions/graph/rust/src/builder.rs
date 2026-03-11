@@ -81,9 +81,9 @@ impl GraphBuilder {
         }
 
         let t = Instant::now();
-        self.discover_chassis();
+        self.discover_zones();
         if debug {
-            eprintln!("  discover_chassis: {:.3}s", t.elapsed().as_secs_f64());
+            eprintln!("  discover_zones: {:.3}s", t.elapsed().as_secs_f64());
         }
 
         let t = Instant::now();
@@ -149,10 +149,10 @@ impl GraphBuilder {
             let kind_plural_or_dir = parts[1];
             let filename = parts[depth - 1];
 
-            // --- variables/<chassis>/vars.yaml ---
-            // Path: src/<layer>/variables/<chassis>/vars.yaml
+            // --- variables/<zone>/vars.yaml ---
+            // Path: src/<layer>/variables/<zone>/vars.yaml
             if depth == 4 && kind_plural_or_dir == "variables" && filename == "vars.yaml" {
-                let chassis_path = parts[2];
+                let zone_path = parts[2];
                 if let Ok(content) = fs::read(path) {
                     if content.starts_with(b"$ANSIBLE_VAULT") {
                         continue;
@@ -172,8 +172,8 @@ impl GraphBuilder {
                         .collect();
                     if !var_names.is_empty() {
                         self.graph.add_node(Node {
-                            name: chassis_path.to_string(),
-                            kind: "chassis".to_string(),
+                            name: zone_path.to_string(),
+                            kind: "zone".to_string(),
                             versioned: false,
                             version: None,
                             path: None,
@@ -182,7 +182,7 @@ impl GraphBuilder {
                         for vn in &var_names {
                             self.known_variables.insert(vn.clone());
                             let mut attrs = HashMap::new();
-                            attrs.insert("chassis".to_string(), chassis_path.to_string());
+                            attrs.insert("zone".to_string(), zone_path.to_string());
                             attrs.insert("vault".to_string(), "false".to_string());
                             attrs.insert("source".to_string(), "group_vars".to_string());
                             self.graph.add_node(Node {
@@ -193,7 +193,7 @@ impl GraphBuilder {
                                 path: None,
                                 attrs,
                             });
-                            self.graph.add_edge(chassis_path, vn, "overrides");
+                            self.graph.add_edge(zone_path, vn, "overrides");
                         }
                         n_gv += 1;
                     }
@@ -201,13 +201,13 @@ impl GraphBuilder {
                 continue;
             }
 
-            // --- cfg/<chassis>/vars.yaml or vault.yaml ---
-            // Path: src/<layer>/cfg/<chassis>/vars.yaml|vault.yaml
+            // --- cfg/<zone>/vars.yaml or vault.yaml ---
+            // Path: src/<layer>/cfg/<zone>/vars.yaml|vault.yaml
             if depth == 4
                 && kind_plural_or_dir == "cfg"
                 && (filename == "vars.yaml" || filename == "vault.yaml")
             {
-                let chassis_path = parts[2];
+                let zone_path = parts[2];
                 let is_vault = filename == "vault.yaml";
                 if let Ok(content) = fs::read(path) {
                     if content.starts_with(b"$ANSIBLE_VAULT") {
@@ -230,8 +230,8 @@ impl GraphBuilder {
                         .collect();
                     if !var_names.is_empty() {
                         self.graph.add_node(Node {
-                            name: chassis_path.to_string(),
-                            kind: "chassis".to_string(),
+                            name: zone_path.to_string(),
+                            kind: "zone".to_string(),
                             versioned: false,
                             version: None,
                             path: None,
@@ -240,7 +240,7 @@ impl GraphBuilder {
                         for vn in &var_names {
                             self.known_variables.insert(vn.clone());
                             let mut attrs = HashMap::new();
-                            attrs.insert("chassis".to_string(), chassis_path.to_string());
+                            attrs.insert("zone".to_string(), zone_path.to_string());
                             attrs.insert("vault".to_string(), is_vault.to_string());
                             attrs.insert("source".to_string(), "group_vars".to_string());
                             self.graph.add_node(Node {
@@ -251,7 +251,7 @@ impl GraphBuilder {
                                 path: None,
                                 attrs,
                             });
-                            self.graph.add_edge(chassis_path, vn, "overrides");
+                            self.graph.add_edge(zone_path, vn, "overrides");
                         }
                         n_gv += 1;
                     }
@@ -472,12 +472,12 @@ impl GraphBuilder {
             eprintln!("  apply_dependencies: {:.3}s", t.elapsed().as_secs_f64());
         }
 
-        // 5. Chassis attachments
+        // 5. Zone attachments
         let t = Instant::now();
-        self.build_chassis_attachments();
+        self.build_zone_attachments();
         if debug {
             eprintln!(
-                "  build_chassis_attachments: {:.3}s",
+                "  build_zone_attachments: {:.3}s",
                 t.elapsed().as_secs_f64()
             );
         }
@@ -585,49 +585,49 @@ impl GraphBuilder {
         }
     }
 
-    fn discover_chassis(&mut self) {
-        let chassis_file = self.compose_dir.join("chassis.yaml");
-        let content = match fs::read_to_string(&chassis_file) {
+    fn discover_zones(&mut self) {
+        let zone_file = self.compose_dir.join("topology.yaml");
+        let content = match fs::read_to_string(&zone_file) {
             Ok(c) => c,
             Err(_) => return,
         };
         let data: serde_yaml::Value = match serde_yaml::from_str(&content) {
             Ok(d) => d,
             Err(e) => {
-                eprintln!("Warning: Failed to parse {}: {}", chassis_file.display(), e);
+                eprintln!("Warning: Failed to parse {}: {}", zone_file.display(), e);
                 return;
             }
         };
 
-        // chassis.yaml has a top-level "platform" key containing the chassis tree.
-        // Extract it and build the tree, connecting platform instances to top-level chassis.
+        // topology.yaml has a top-level "platform" key containing the zone tree.
+        // Extract it and build the tree, connecting platform instances to top-level zones.
         if let Some(platform_data) = data.get("platform") {
-            self.build_top_chassis(platform_data, "platform");
+            self.build_top_zones(platform_data, "platform");
         }
     }
 
-    /// Build top-level chassis nodes and connect each platform instance to them.
-    /// Deeper levels use add_chassis_hierarchy (no platform edges needed).
-    fn build_top_chassis(&mut self, data: &serde_yaml::Value, prefix: &str) {
+    /// Build top-level zone nodes and connect each platform instance to them.
+    /// Deeper levels use add_zone_hierarchy (no platform edges needed).
+    fn build_top_zones(&mut self, data: &serde_yaml::Value, prefix: &str) {
         let platform_names = self.platform_names.clone();
         match data {
             serde_yaml::Value::Mapping(map) => {
                 for (key, value) in map {
                     if let Some(key_str) = key.as_str() {
-                        let chassis_name = format!("{}.{}", prefix, key_str);
+                        let zone_name = format!("{}.{}", prefix, key_str);
                         self.graph.add_node(Node {
-                            name: chassis_name.clone(),
-                            kind: "chassis".to_string(),
+                            name: zone_name.clone(),
+                            kind: "zone".to_string(),
                             versioned: false,
                             version: None,
                             path: None,
                             attrs: HashMap::new(),
                         });
                         for pname in &platform_names {
-                            self.graph.add_edge(pname, &chassis_name, "contains");
+                            self.graph.add_edge(pname, &zone_name, "contains");
                         }
                         if !value.is_null() {
-                            self.add_chassis_hierarchy(value, &chassis_name);
+                            self.add_zone_hierarchy(value, &zone_name);
                         }
                     }
                 }
@@ -636,21 +636,21 @@ impl GraphBuilder {
                 for item in seq {
                     match item {
                         serde_yaml::Value::String(s) => {
-                            let chassis_name = format!("{}.{}", prefix, s);
+                            let zone_name = format!("{}.{}", prefix, s);
                             self.graph.add_node(Node {
-                                name: chassis_name.clone(),
-                                kind: "chassis".to_string(),
+                                name: zone_name.clone(),
+                                kind: "zone".to_string(),
                                 versioned: false,
                                 version: None,
                                 path: None,
                                 attrs: HashMap::new(),
                             });
                             for pname in &platform_names {
-                                self.graph.add_edge(pname, &chassis_name, "contains");
+                                self.graph.add_edge(pname, &zone_name, "contains");
                             }
                         }
                         serde_yaml::Value::Mapping(_) => {
-                            self.build_top_chassis(item, prefix);
+                            self.build_top_zones(item, prefix);
                         }
                         _ => {}
                     }
@@ -660,23 +660,23 @@ impl GraphBuilder {
         }
     }
 
-    fn add_chassis_hierarchy(&mut self, data: &serde_yaml::Value, parent: &str) {
+    fn add_zone_hierarchy(&mut self, data: &serde_yaml::Value, parent: &str) {
         match data {
             serde_yaml::Value::Mapping(map) => {
                 for (key, value) in map {
                     if let Some(key_str) = key.as_str() {
-                        let chassis_name = format!("{}.{}", parent, key_str);
+                        let zone_name = format!("{}.{}", parent, key_str);
                         self.graph.add_node(Node {
-                            name: chassis_name.clone(),
-                            kind: "chassis".to_string(),
+                            name: zone_name.clone(),
+                            kind: "zone".to_string(),
                             versioned: false,
                             version: None,
                             path: None,
                             attrs: HashMap::new(),
                         });
-                        self.graph.add_edge(parent, &chassis_name, "contains");
+                        self.graph.add_edge(parent, &zone_name, "contains");
                         if !value.is_null() {
-                            self.add_chassis_hierarchy(value, &chassis_name);
+                            self.add_zone_hierarchy(value, &zone_name);
                         }
                     }
                 }
@@ -685,19 +685,19 @@ impl GraphBuilder {
                 for item in seq {
                     match item {
                         serde_yaml::Value::String(s) => {
-                            let chassis_name = format!("{}.{}", parent, s);
+                            let zone_name = format!("{}.{}", parent, s);
                             self.graph.add_node(Node {
-                                name: chassis_name.clone(),
-                                kind: "chassis".to_string(),
+                                name: zone_name.clone(),
+                                kind: "zone".to_string(),
                                 versioned: false,
                                 version: None,
                                 path: None,
                                 attrs: HashMap::new(),
                             });
-                            self.graph.add_edge(parent, &chassis_name, "contains");
+                            self.graph.add_edge(parent, &zone_name, "contains");
                         }
                         serde_yaml::Value::Mapping(_) => {
-                            self.add_chassis_hierarchy(item, parent);
+                            self.add_zone_hierarchy(item, parent);
                         }
                         _ => {}
                     }
@@ -765,17 +765,17 @@ impl GraphBuilder {
             .unwrap_or_else(|| path.file_stem().unwrap().to_str().unwrap())
             .to_string();
 
-        let mut chassis_list = Vec::new();
-        if let Some(seq) = data.get("chassis").and_then(|v| v.as_sequence()) {
+        let mut zone_list = Vec::new();
+        if let Some(seq) = data.get("zones").and_then(|v| v.as_sequence()) {
             for item in seq {
                 if let Some(s) = item.as_str() {
-                    chassis_list.push(s.to_string());
+                    zone_list.push(s.to_string());
                 }
             }
         }
 
         let mut attrs = HashMap::new();
-        attrs.insert("chassis".to_string(), chassis_list.join(","));
+        attrs.insert("zones".to_string(), zone_list.join(","));
 
         self.graph.add_node(Node {
             name: hostname.clone(),
@@ -786,16 +786,16 @@ impl GraphBuilder {
             attrs,
         });
 
-        for chassis in &chassis_list {
+        for zone in &zone_list {
             self.graph.add_node(Node {
-                name: chassis.clone(),
-                kind: "chassis".to_string(),
+                name: zone.clone(),
+                kind: "zone".to_string(),
                 versioned: false,
                 version: None,
                 path: None,
                 attrs: HashMap::new(),
             });
-            self.graph.add_edge(&hostname, chassis, "allocates");
+            self.graph.add_edge(&hostname, zone, "allocates");
         }
 
         // Node executes its platform instance
@@ -804,7 +804,7 @@ impl GraphBuilder {
         }
     }
 
-    fn build_chassis_attachments(&mut self) {
+    fn build_zone_attachments(&mut self) {
         let src_dir = self.compose_dir.join("src");
         let entries = match fs::read_dir(&src_dir) {
             Ok(e) => e,
@@ -866,7 +866,7 @@ impl GraphBuilder {
 
             self.graph.add_node(Node {
                 name: hosts.clone(),
-                kind: "chassis".to_string(),
+                kind: "zone".to_string(),
                 versioned: false,
                 version: None,
                 path: None,

@@ -11,9 +11,9 @@ func testGraph(t *testing.T) *PlatformGraph {
 	raw := rawGraphResult{
 		Nodes: []rawNode{
 			{ID: "platform", Type: "platform", Kind: "platform"},
-			{ID: "platform.foundation", Type: "chassis", Kind: "chassis", Layer: "foundation"},
-			{ID: "platform.interaction", Type: "chassis", Kind: "chassis", Layer: "interaction"},
-			{ID: "platform.cognition", Type: "chassis", Kind: "chassis", Layer: "cognition"},
+			{ID: "platform.foundation", Type: "zone", Kind: "zone", Layer: "foundation"},
+			{ID: "platform.interaction", Type: "zone", Kind: "zone", Layer: "interaction"},
+			{ID: "platform.cognition", Type: "zone", Kind: "zone", Layer: "cognition"},
 			{ID: "interaction.applications.dashboards", Type: "component", Kind: "application", Layer: "interaction", Version: "abc123", Path: "/interaction/applications"},
 			{ID: "interaction.services.dashboards_grafana", Type: "component", Kind: "service", Layer: "interaction"},
 			{ID: "interaction.softwares.grafana", Type: "component", Kind: "software", Layer: "interaction"},
@@ -79,9 +79,9 @@ func TestNodeLookup(t *testing.T) {
 func TestNodesByKind(t *testing.T) {
 	g := testGraph(t)
 
-	chassis := g.NodesByKind("chassis")
-	if len(chassis) != 3 {
-		t.Errorf("NodesByKind(chassis) = %d, want 3", len(chassis))
+	zones := g.NodesByKind("zone")
+	if len(zones) != 3 {
+		t.Errorf("NodesByKind(zone) = %d, want 3", len(zones))
 	}
 
 	apps := g.NodesByKind("application")

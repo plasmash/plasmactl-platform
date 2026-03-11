@@ -280,7 +280,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 			Suggest: input.Opt("suggest").(bool),
 			Add:     input.Opt("add").(string),
 			Remove:  input.Opt("remove").(string),
-			Chassis: action.InputOptSlice[string](input, "chassis"),
+			Zones:   action.InputOptSlice[string](input, "zone"),
 			Machine: input.Opt("machine").(string),
 			Count:   input.Opt("count").(int),
 		}

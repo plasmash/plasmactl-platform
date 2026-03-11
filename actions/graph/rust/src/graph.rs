@@ -453,7 +453,7 @@ fn kind_color(kind: &str) -> (u8, u8, u8) {
         "platform"    => ( 74, 144, 217), // blue
         "model"       => (155,  89, 182), // purple
         "package"     => (230, 126,  34), // orange
-        "chassis"     => (121,  85,  72), // brown
+        "zone"        => (121,  85,  72), // brown
         "agent"       => ( 39, 174,  96), // green
         "application" => ( 41, 128, 185), // steel blue
         "skill"       => ( 46, 204, 113), // light green

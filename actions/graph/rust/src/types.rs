@@ -105,7 +105,7 @@ pub fn determine_edge_type(source_kind: &str, target_name: &str) -> &'static str
 /// Guess node kind from its name.
 pub fn guess_kind(name: &str) -> &'static str {
     if name.starts_with("platform.") && name[9..].contains('.') {
-        return "chassis";
+        return "zone";
     }
     let parts: Vec<&str> = name.splitn(3, '.').collect();
     if parts.len() >= 2 {

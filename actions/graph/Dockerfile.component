@@ -1,0 +1,22 @@
+# Build the graph web component with cytoscape bundled.
+# Produces component.js for embedding in the Go binary.
+#
+# Usage (via Makefile):
+#   make graph-component
+
+FROM node:22-alpine AS builder
+
+WORKDIR /build
+
+# Install build dependencies.
+RUN npm init -y && npm install --save-exact esbuild@0.25.0 cytoscape@3.31.0
+
+# Copy source files.
+COPY component.tsx build.mjs ./
+
+# Build the component.
+RUN node build.mjs
+
+# Output stage: just the compiled JS.
+FROM busybox:musl AS output
+COPY --from=builder /build/component.js /component.js
