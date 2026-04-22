@@ -48,8 +48,8 @@ func (v *Validate) Result() any {
 
 // Execute runs the platform:validate action
 func (v *Validate) Execute() error {
-	instDir := filepath.Join("inst", v.Name)
-	platformFile := filepath.Join(instDir, "platform.yaml")
+	platformDir := filepath.Join("platforms", v.Name)
+	platformFile := filepath.Join(platformDir, "platform.yaml")
 
 	// Check if platform exists
 	if _, err := os.Stat(platformFile); os.IsNotExist(err) {
@@ -215,7 +215,7 @@ func (v *Validate) Execute() error {
 	}
 
 	// Check nodes directory
-	nodesDir := filepath.Join(instDir, "nodes")
+	nodesDir := filepath.Join(platformDir, "nodes")
 	nodeCount := 0
 	if nodeEntries, err := os.ReadDir(nodesDir); err == nil {
 		for _, nodeEntry := range nodeEntries {

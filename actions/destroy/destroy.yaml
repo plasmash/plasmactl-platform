@@ -9,8 +9,9 @@ action:
       description: The name of the platform to destroy
       required: true
   options:
-    - name: yes-i-am-sure
-      title: Yes I Am Sure
+    - name: force
+      shorthand: f
+      title: Force
       description: Skip confirmation prompt (for automation)
       type: boolean
       default: false

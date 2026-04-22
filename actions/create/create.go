@@ -54,13 +54,13 @@ func (c *Create) Result() any {
 
 // Execute runs the platform:create action
 func (c *Create) Execute() error {
-	instDir := filepath.Join("inst", c.Name)
-	nodesDir := filepath.Join(instDir, "nodes")
-	platformFile := filepath.Join(instDir, "platform.yaml")
+	platformDir := filepath.Join("platforms", c.Name)
+	nodesDir := filepath.Join(platformDir, "nodes")
+	platformFile := filepath.Join(platformDir, "platform.yaml")
 
 	// Check if platform already exists
-	if _, err := os.Stat(instDir); !os.IsNotExist(err) {
-		return fmt.Errorf("platform %q already exists at %s", c.Name, instDir)
+	if _, err := os.Stat(platformDir); !os.IsNotExist(err) {
+		return fmt.Errorf("platform %q already exists at %s", c.Name, platformDir)
 	}
 
 	c.Term().Info().Printfln("Creating platform %q", c.Name)
@@ -194,10 +194,10 @@ func (c *Create) Execute() error {
 		ProjectID:     platform.Infrastructure.ProjectID,
 		Image:         platform.Infrastructure.Image,
 		SSHKeyID:      platform.Infrastructure.SSHKeyID,
-		Path:          instDir,
+		Path:          platformDir,
 	}
 
-	c.Term().Success().Printfln("Created platform scaffold at %s", instDir)
+	c.Term().Success().Printfln("Created platform scaffold at %s", platformDir)
 
 	// Print next steps
 	c.Term().Info().Println()

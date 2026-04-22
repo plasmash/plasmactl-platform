@@ -4,16 +4,16 @@ action:
   icon: rocket_launch
   description: Deploy Ansible resources to target cluster
   arguments:
-    - name: environment
-      title: Environment
-      description: The environment to deploy to
+    - name: name
+      title: Name
+      description: The platform to deploy to
       required: true
     - name: tags
       title: Tags
       description: The Ansible resources to deploy (comma-separated)
       required: true
   options:
-    - name: img
+    - name: image
       title: Platform Image
       description: Deploy from a Platform Image (.pm) file
       type: string
@@ -49,7 +49,7 @@ action:
   result:
     type: object
     properties:
-      environment:
+      name:
         type: string
       tags:
         type: string

@@ -15,7 +15,7 @@ import (
 // UpOptions holds options for the platform:up command
 type UpOptions struct {
 	Bin                string
-	Img                string
+	Image              string
 	Last               bool
 	SkipBump           bool
 	SkipPrepare        bool
@@ -82,20 +82,20 @@ func NewUp(a *action.Action, k keyring.Keyring, m action.Manager) *Up {
 }
 
 // Run executes the platform:up workflow
-func (u *Up) Run(ctx context.Context, environment, tags string, options UpOptions) error {
+func (u *Up) Run(ctx context.Context, name, tags string, options UpOptions) error {
 	if options.CI {
 		u.Term().Info().Println("--ci option is deprecated: builds are now done by default in CI")
 	}
 
 	// Deploy from Platform Image - skip compose/sync/bump/prepare
-	if options.Img != "" {
-		u.Term().Info().Printfln("Deploying from Platform Image: %s", options.Img)
+	if options.Image != "" {
+		u.Term().Info().Printfln("Deploying from Platform Image: %s", options.Image)
 
 		err := u.executeAction(ctx, "platform:deploy", action.InputParams{
-			"environment": environment,
+			"name": name,
 			"tags":        tags,
 		}, action.InputParams{
-			"img":   options.Img,
+			"image": options.Image,
 			"debug": options.Debug,
 		}, options.Persistent, options.Streams)
 		if err != nil {
@@ -105,7 +105,7 @@ func (u *Up) Run(ctx context.Context, environment, tags string, options UpOption
 		return nil
 	}
 
-	u.Log().Info("arguments", "environment", environment, "tags", tags)
+	u.Log().Info("arguments", "name", name, "tags", tags)
 
 	ansibleDebug := options.Debug
 	if ansibleDebug {
@@ -166,7 +166,7 @@ func (u *Up) Run(ctx context.Context, environment, tags string, options UpOption
 		}
 
 		err = u.executeAction(ctx, "platform:deploy", action.InputParams{
-			"environment": environment,
+			"name": name,
 			"tags":        tags,
 		}, action.InputParams{
 			"debug": options.Debug,
@@ -238,7 +238,7 @@ func (u *Up) Run(ctx context.Context, environment, tags string, options UpOption
 		}
 
 		// Trigger pipeline
-		pipelineID, err := u.CI.TriggerPipeline(gitlabDomain, gitlabAccessToken, projectID, branchName, environment, tags, ansibleDebug)
+		pipelineID, err := u.CI.TriggerPipeline(gitlabDomain, gitlabAccessToken, projectID, branchName, name, tags, ansibleDebug)
 		if err != nil {
 			return fmt.Errorf("failed to trigger pipeline: %w", err)
 		}

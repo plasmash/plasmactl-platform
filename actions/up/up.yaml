@@ -1,17 +1,17 @@
 runtime: plugin
 action:
-  title: Up
+  title: Deploy Platform (Full Workflow)
   icon: publish
   description: "Full workflow: bump → compose → prepare → deploy (local), or trigger CI pipeline"
   arguments:
-    - name: environment
-      title: Environment
+    - name: name
+      title: Name
       required: true
     - name: tags
       title: Tags
       required: true
   options:
-    - name: img
+    - name: image
       title: Platform Image
       description: Deploy from a Platform Image (.pi) file
       type: string

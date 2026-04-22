@@ -194,10 +194,10 @@ plasmactl platform:deploy ski-dev
 
 ## Directory Structure
 
-Platforms are stored in `inst/`:
+Platforms are stored in `platforms/`:
 
 ```
-inst/
+platforms/
 └── ski-dev/
     ├── platform.yaml      # Platform configuration
     └── nodes/             # Node definitions

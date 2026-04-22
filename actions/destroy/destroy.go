@@ -25,9 +25,9 @@ type Destroy struct {
 
 	Keyring keyring.Keyring
 
-	Name       string
-	YesIAmSure bool
-	KeepDNS    bool
+	Name    string
+	Force   bool
+	KeepDNS bool
 
 	result *DestroyResult
 }
@@ -41,15 +41,15 @@ func (d *Destroy) Result() any {
 func (d *Destroy) Execute() error {
 	d.result = &DestroyResult{Name: d.Name}
 
-	instDir := filepath.Join("inst", d.Name)
+	platformDir := filepath.Join("platforms", d.Name)
 
 	// Check if platform exists
-	if _, err := os.Stat(instDir); os.IsNotExist(err) {
+	if _, err := os.Stat(platformDir); os.IsNotExist(err) {
 		return fmt.Errorf("platform %q not found", d.Name)
 	}
 
 	// Confirm destruction
-	if !d.YesIAmSure {
+	if !d.Force {
 		confirmed, err := confirmDestroy(d.Term(), "platform", d.Name)
 		if err != nil {
 			return err
@@ -70,7 +70,7 @@ func (d *Destroy) Execute() error {
 
 	// TODO: Destroy nodes via Terraform
 	// This should invoke node:destroy for each node
-	nodesDir := filepath.Join(instDir, "nodes")
+	nodesDir := filepath.Join(platformDir, "nodes")
 	if nodeEntries, err := os.ReadDir(nodesDir); err == nil {
 		for _, nodeEntry := range nodeEntries {
 			if !nodeEntry.IsDir() && filepath.Ext(nodeEntry.Name()) == ".yaml" && nodeEntry.Name() != ".gitkeep" {
@@ -83,7 +83,7 @@ func (d *Destroy) Execute() error {
 
 	// Remove the environment directory
 	d.Term().Info().Println("  Removing platform directory...")
-	if err := os.RemoveAll(instDir); err != nil {
+	if err := os.RemoveAll(platformDir); err != nil {
 		return fmt.Errorf("failed to remove platform directory: %w", err)
 	}
 

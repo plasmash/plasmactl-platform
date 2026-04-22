@@ -41,8 +41,8 @@ func (s *Show) Result() any {
 }
 
 func (s *Show) Execute() error {
-	instDir := filepath.Join("inst", s.Name)
-	platformFile := filepath.Join(instDir, "platform.yaml")
+	platformDir := filepath.Join("platforms", s.Name)
+	platformFile := filepath.Join(platformDir, "platform.yaml")
 
 	// Check if platform exists
 	if _, err := os.Stat(platformFile); os.IsNotExist(err) {
@@ -61,7 +61,7 @@ func (s *Show) Execute() error {
 	}
 
 	// Count and list nodes
-	nodesDir := filepath.Join(instDir, "nodes")
+	nodesDir := filepath.Join(platformDir, "nodes")
 	var nodes []string
 	if nodeEntries, err := os.ReadDir(nodesDir); err == nil {
 		for _, nodeEntry := range nodeEntries {

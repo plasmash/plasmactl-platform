@@ -29,21 +29,21 @@ func (l *List) Result() any {
 }
 
 func (l *List) Execute() error {
-	instDir := "inst"
+	platformsDir := "platforms"
 
 	// Initialize result early so --json always returns an object, never null
 	l.result = &ListResult{Platforms: []schema.PlatformInfo{}}
 
-	// Check if inst directory exists
-	if _, err := os.Stat(instDir); os.IsNotExist(err) {
-		l.Term().Info().Println("No platforms found (inst/ directory does not exist)")
+	// Check if platforms directory exists
+	if _, err := os.Stat(platformsDir); os.IsNotExist(err) {
+		l.Term().Info().Println("No platforms found (platforms/ directory does not exist)")
 		return nil
 	}
 
-	// List all directories in inst/
-	entries, err := os.ReadDir(instDir)
+	// List all directories in platforms/
+	entries, err := os.ReadDir(platformsDir)
 	if err != nil {
-		return fmt.Errorf("failed to read inst directory: %w", err)
+		return fmt.Errorf("failed to read platforms directory: %w", err)
 	}
 
 	var platforms []schema.PlatformInfo
@@ -53,7 +53,7 @@ func (l *List) Execute() error {
 			continue
 		}
 
-		platformFile := filepath.Join(instDir, entry.Name(), "platform.yaml")
+		platformFile := filepath.Join(platformsDir, entry.Name(), "platform.yaml")
 		if _, err := os.Stat(platformFile); os.IsNotExist(err) {
 			continue // Not a valid platform directory
 		}
@@ -72,7 +72,7 @@ func (l *List) Execute() error {
 		}
 
 		// Count nodes
-		nodesDir := filepath.Join(instDir, entry.Name(), "nodes")
+		nodesDir := filepath.Join(platformsDir, entry.Name(), "nodes")
 		nodeCount := 0
 		if nodeEntries, err := os.ReadDir(nodesDir); err == nil {
 			for _, nodeEntry := range nodeEntries {

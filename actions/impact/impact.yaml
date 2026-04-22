@@ -4,9 +4,9 @@ action:
   icon: track_changes
   description: "Analyze the blast radius of changing or removing any graph node: component, variable, zone, node, package, or flow"
   arguments:
-    - name: name
-      title: Name
-      description: "The name of the entity to analyze (component, variable, zone, node, package, or flow)"
+    - name: identifier
+      title: Identifier
+      description: "The graph node identifier to analyze (component, variable, zone, node, package, or flow)"
       required: true
   result:
     type: object

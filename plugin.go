@@ -170,12 +170,12 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	upAction := action.NewFromYAML("platform:up", upYaml)
 	upAction.SetRuntime(action.NewFnRuntimeWithResult(func(ctx context.Context, a *action.Action) (any, error) {
 		input := a.Input()
-		env := input.Arg("environment").(string)
+		name := input.Arg("name").(string)
 		tags := input.Arg("tags").(string)
 		v := launchr.Version()
 		options := up.UpOptions{
 			Bin:                v.Name,
-			Img:                input.Opt("img").(string),
+			Image:              input.Opt("image").(string),
 			Last:               input.Opt("last").(bool),
 			SkipBump:           input.Opt("skip-bump").(bool),
 			SkipPrepare:        input.Opt("skip-prepare").(bool),
@@ -191,7 +191,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 
 		u := up.NewUp(a, p.k, p.m)
-		err := u.Run(ctx, env, tags, options)
+		err := u.Run(ctx, name, tags, options)
 		return u.Result(), err
 	}))
 	actions = append(actions, upAction)
@@ -299,9 +299,9 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		log, term := getLoggerTerm(a)
 		d := &destroy.Destroy{
 			Keyring:    p.k,
-			Name:       input.Arg("name").(string),
-			YesIAmSure: input.Opt("yes-i-am-sure").(bool),
-			KeepDNS:    input.Opt("keep-dns").(bool),
+			Name:    input.Arg("name").(string),
+			Force:   input.Opt("force").(bool),
+			KeepDNS: input.Opt("keep-dns").(bool),
 		}
 		d.SetLogger(log)
 		d.SetTerm(term)
@@ -318,9 +318,9 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		log, term := getLoggerTerm(a)
 		d := &deploy.Deploy{
 			Keyring:     p.k,
-			Environment: input.Arg("environment").(string),
-			Tags:        input.Arg("tags").(string),
-			Img:         input.Opt("img").(string),
+			Name:       input.Arg("name").(string),
+			Tags:       input.Arg("tags").(string),
+			Image:      input.Opt("image").(string),
 			Debug:       input.Opt("debug").(bool),
 			Check:       input.Opt("check").(bool),
 			Password:    input.Opt("password").(string),
@@ -364,7 +364,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		imp := &impact.Impact{
-			Name: input.Arg("name").(string),
+			Identifier: input.Arg("identifier").(string),
 		}
 		imp.SetLogger(log)
 		imp.SetTerm(term)

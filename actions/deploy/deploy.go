@@ -17,9 +17,9 @@ import (
 
 // DeployResult is the structured output for platform:deploy
 type DeployResult struct {
-	Environment string `json:"environment"`
-	Tags        string `json:"tags"`
-	Success     bool   `json:"success"`
+	Name    string `json:"name"`
+	Tags    string `json:"tags"`
+	Success bool   `json:"success"`
 }
 
 // Deploy implements the platform:deploy command
@@ -29,14 +29,14 @@ type Deploy struct {
 
 	Keyring keyring.Keyring
 
-	Environment string
-	Tags        string
-	Img         string
-	Debug       bool
-	Check       bool
-	Password    string
-	Logs        bool
-	PrepareDir  string
+	Name       string
+	Tags       string
+	Image      string
+	Debug      bool
+	Check      bool
+	Password   string
+	Logs       bool
+	PrepareDir string
 
 	originalDir  string
 	extractedDir string
@@ -51,8 +51,8 @@ func (d *Deploy) Result() any {
 // Execute runs the platform:deploy action
 func (d *Deploy) Execute() error {
 	d.result = &DeployResult{
-		Environment: d.Environment,
-		Tags:        d.Tags,
+		Name: d.Name,
+		Tags: d.Tags,
 	}
 
 	var err error
@@ -62,7 +62,7 @@ func (d *Deploy) Execute() error {
 	}
 
 	// Extract Platform Image if provided
-	if d.Img != "" {
+	if d.Image != "" {
 		if err := d.extractImage(); err != nil {
 			return err
 		}
@@ -89,7 +89,7 @@ func (d *Deploy) Execute() error {
 		return fmt.Errorf("inventory cache does not exist, cannot deploy (run platform:prepare first)")
 	}
 
-	d.Term().Info().Printfln("Deploying %s to %s...", d.Tags, d.Environment)
+	d.Term().Info().Printfln("Deploying %s to %s...", d.Tags, d.Name)
 
 	// Build ansible-playbook command
 	args := d.buildAnsibleArgs()
@@ -110,7 +110,7 @@ func (d *Deploy) Execute() error {
 
 // extractImage extracts a Platform Image (.pm) file
 func (d *Deploy) extractImage() error {
-	imgPath := d.Img
+	imgPath := d.Image
 	if !filepath.IsAbs(imgPath) {
 		imgPath = filepath.Join(d.originalDir, imgPath)
 	}
@@ -196,7 +196,7 @@ func (d *Deploy) cleanup() {
 
 // cacheExists checks if the inventory cache file exists
 func (d *Deploy) cacheExists() bool {
-	configPath := fmt.Sprintf("library/inventories/platform_nodes/configuration/%s.yaml", d.Environment)
+	configPath := fmt.Sprintf("library/inventories/platform_nodes/configuration/%s.yaml", d.Name)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -228,7 +228,7 @@ func (d *Deploy) buildAnsibleArgs() []string {
 	args := []string{
 		"platform/platform.yaml",
 		"--tags", d.Tags,
-		"--extra-vars", fmt.Sprintf("machine_target_config=%s", d.Environment),
+		"--extra-vars", fmt.Sprintf("machine_target_config=%s", d.Name),
 	}
 
 	if d.Debug {
@@ -272,7 +272,7 @@ func (d *Deploy) buildEnvironment() []string {
 				}
 			}
 		}
-		attrsMap["env"] = d.Environment
+		attrsMap["env"] = d.Name
 
 		var newAttrs []string
 		for k, v := range attrsMap {

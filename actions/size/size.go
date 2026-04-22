@@ -52,10 +52,10 @@ func (s *Size) Result() any {
 
 // Execute runs the platform:size action
 func (s *Size) Execute() error {
-	envDir := filepath.Join("inst", s.Name)
-	platformFile := filepath.Join(envDir, "platform.yaml")
+	platformDir := filepath.Join("platforms", s.Name)
+	platformFile := filepath.Join(platformDir, "platform.yaml")
 
-	if _, err := os.Stat(envDir); os.IsNotExist(err) {
+	if _, err := os.Stat(platformDir); os.IsNotExist(err) {
 		return fmt.Errorf("platform %q not found", s.Name)
 	}
 

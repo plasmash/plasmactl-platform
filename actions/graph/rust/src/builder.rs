@@ -19,7 +19,7 @@ const PRUNE_DIRS: &[&str] = &[
     "ansible_collections",
     "dist",
     "img",
-    "inst",
+    "platforms",
 ];
 
 /// Task file names we care about.
@@ -548,8 +548,8 @@ impl GraphBuilder {
 
     /// Discover all platform instances from inst/*/platform.yaml.
     fn discover_platforms(&mut self) {
-        let inst_dir = self.compose_dir.join("inst");
-        if let Ok(entries) = fs::read_dir(&inst_dir) {
+        let platforms_dir = self.compose_dir.join("platforms");
+        if let Ok(entries) = fs::read_dir(&platforms_dir) {
             for entry in entries.flatten() {
                 if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                     continue;
@@ -708,11 +708,11 @@ impl GraphBuilder {
     }
 
     fn discover_nodes(&mut self) {
-        let inst_dir = self.compose_dir.join("inst");
-        if !inst_dir.exists() {
+        let platforms_dir = self.compose_dir.join("platforms");
+        if !platforms_dir.exists() {
             return;
         }
-        let entries = match fs::read_dir(&inst_dir) {
+        let entries = match fs::read_dir(&platforms_dir) {
             Ok(e) => e,
             Err(_) => return,
         };

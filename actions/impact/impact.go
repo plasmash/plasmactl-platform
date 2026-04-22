@@ -29,7 +29,7 @@ type Impact struct {
 	action.WithLogger
 	action.WithTerm
 
-	Name string
+	Identifier string
 
 	result *ImpactResult
 }
@@ -46,9 +46,9 @@ func (imp *Impact) Execute() error {
 		return fmt.Errorf("failed to load graph: %w", err)
 	}
 
-	node := g.Node(imp.Name)
+	node := g.Node(imp.Identifier)
 	if node == nil {
-		return fmt.Errorf("node %q not found in graph", imp.Name)
+		return fmt.Errorf("node %q not found in graph", imp.Identifier)
 	}
 
 	imp.result = &ImpactResult{
