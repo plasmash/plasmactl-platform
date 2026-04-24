@@ -23,7 +23,7 @@ A [Launchr](https://github.com/launchrctl/launchr) plugin for [Plasmactl](https:
 Full deployment workflow (bump → compose → prepare → deploy):
 
 ```bash
-# Deploy a chassis section
+# Deploy a zone
 plasmactl platform:up dev platform.interaction.observability
 
 # Deploy a specific application
@@ -226,7 +226,7 @@ plasmactl keyring:login github
 | Plugin | Command | Purpose |
 |--------|---------|---------|
 | plasmactl-node | `node:provision` | Provision infrastructure |
-| plasmactl-node | `node:allocate` | Allocate nodes to chassis |
+| plasmactl-node | `node:allocate` | Allocate nodes to zones |
 | plasmactl-model | `model:compose` | Compose packages |
 | plasmactl-model | `model:prepare` | Prepare for deployment |
 | plasmactl-component | `component:bump` | Bump versions |
