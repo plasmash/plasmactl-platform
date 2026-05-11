@@ -4,6 +4,13 @@ func init() {
 	RegisterTemplate("scaleway", scalewayDediboxTemplate)
 }
 
+// Supports two credential shapes:
+//   new shape (plasmactl-auth): ScalewayAccessKey/SecretKey + ProjectID →
+//     3-var provider block matching scaleway/scaleway TF provider requirements.
+//   legacy shape: APIToken → single-var form (historically only set
+//     secret_key; lacks access_key + project_id, so it works only for
+//     unauthenticated reads. Left intact so existing Scaleway platforms
+//     keep running until they migrate.)
 const scalewayDediboxTemplate = `
 terraform {
   required_providers {
@@ -14,13 +21,42 @@ terraform {
   }
 }
 
+{{- if .ScalewayAccessKey }}
+provider "scaleway" {
+  access_key = var.scaleway_access_key
+  secret_key = var.scaleway_secret_key
+  project_id = var.scaleway_project_id
+  zone       = "{{ .Zone }}"
+}
+
+variable "scaleway_access_key" {
+  description = "Scaleway API access key"
+  type        = string
+  sensitive   = true
+  default     = "{{ .ScalewayAccessKey }}"
+}
+
+variable "scaleway_secret_key" {
+  description = "Scaleway API secret key"
+  type        = string
+  sensitive   = true
+  default     = "{{ .ScalewaySecretKey }}"
+}
+
+variable "scaleway_project_id" {
+  description = "Scaleway project ID"
+  type        = string
+  sensitive   = true
+  default     = "{{ .ProjectID }}"
+}
+{{- else }}
 provider "scaleway" {
   secret_key = var.api_token
   zone       = "{{ .Zone }}"
 }
 
 variable "api_token" {
-  description = "Scaleway API secret key"
+  description = "Scaleway API secret key (deprecated single-token form)"
   type        = string
   sensitive   = true
   default     = "{{ .APIToken }}"
@@ -33,6 +69,7 @@ variable "project_id" {
   type        = string
   default     = "{{ .ProjectID }}"
 }
+{{- end }}
 {{- end }}
 
 # --- Import existing nodes ---
@@ -59,7 +96,7 @@ data "scaleway_dedibox_offer" "offer_{{ $i }}" {
 resource "scaleway_dedibox_server" "{{ $.EnvName | replace "-" "_" }}_{{ $pool.Name | replace "-" "_" }}_{{ $j }}" {
   offer_id = data.scaleway_dedibox_offer.offer_{{ $i }}.offer_id
 {{- if $.ProjectID }}
-  project_id = var.project_id
+  project_id = {{ if $.ScalewayAccessKey }}var.scaleway_project_id{{ else }}var.project_id{{ end }}
 {{- end }}
 }
 {{- end }}
@@ -89,7 +126,7 @@ resource "scaleway_dedibox_server_install" "{{ $.EnvName | replace "-" "_" }}_{{
 resource "scaleway_dedibox_failover_ip" "{{ $.EnvName | replace "-" "_" }}_{{ $pool.Name | replace "-" "_" }}_{{ $j }}" {
   offer_id  = 1
 {{- if $.ProjectID }}
-  project_id = var.project_id
+  project_id = {{ if $.ScalewayAccessKey }}var.scaleway_project_id{{ else }}var.project_id{{ end }}
 {{- end }}
   server_id = scaleway_dedibox_server.{{ $.EnvName | replace "-" "_" }}_{{ $pool.Name | replace "-" "_" }}_{{ $j }}.id
 }
@@ -101,7 +138,7 @@ resource "scaleway_dedibox_failover_ip" "{{ $.EnvName | replace "-" "_" }}_{{ $p
 resource "scaleway_dedibox_rpn_group" "{{ .EnvName | replace "-" "_" }}" {
   name = "{{ .EnvName }}"
 {{- if .ProjectID }}
-  project_id = var.project_id
+  project_id = {{ if .ScalewayAccessKey }}var.scaleway_project_id{{ else }}var.project_id{{ end }}
 {{- end }}
   type = "standard"
   server_ids = [

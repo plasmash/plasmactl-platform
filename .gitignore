@@ -10,3 +10,4 @@ dist/
 vendor/
 actions/graph/graph
 actions/graph/rust/target/
+/.plasmactl/

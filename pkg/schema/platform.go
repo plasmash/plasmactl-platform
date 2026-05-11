@@ -20,13 +20,14 @@ type Platform struct {
 
 // Infrastructure defines the infrastructure provider configuration
 type Infrastructure struct {
-	MetalProvider string    `yaml:"metal_provider"        json:"metal_provider"`
-	API           APIConfig `yaml:"api,omitempty"         json:"api,omitempty"`
-	Zone          string    `yaml:"zone,omitempty"        json:"zone,omitempty"`
-	Region        string    `yaml:"region,omitempty"      json:"region,omitempty"`
-	ProjectID     string    `yaml:"project_id,omitempty"  json:"project_id,omitempty"`
-	Image         string    `yaml:"image,omitempty"       json:"image,omitempty"`
-	SSHKeyID      string    `yaml:"ssh_key_id,omitempty"  json:"ssh_key_id,omitempty"`
+	MetalProvider string    `yaml:"metal_provider"            json:"metal_provider"`
+	API           APIConfig `yaml:"api,omitempty"             json:"api,omitempty"`
+	Zone          string    `yaml:"zone,omitempty"            json:"zone,omitempty"`
+	Region        string    `yaml:"region,omitempty"          json:"region,omitempty"`
+	ProjectID     string    `yaml:"project_id,omitempty"      json:"project_id,omitempty"`
+	Image         string    `yaml:"image,omitempty"           json:"image,omitempty"`
+	SSHKeyID      string    `yaml:"ssh_key_id,omitempty"      json:"ssh_key_id,omitempty"`
+	PrivateVLANID int       `yaml:"private_vlan_id,omitempty" json:"private_vlan_id,omitempty"`
 }
 
 // DNSConfig defines DNS provider configuration
@@ -39,10 +40,23 @@ type DNSConfig struct {
 	DKIMKey  string    `yaml:"dkim_key,omitempty"    json:"-"`
 }
 
-// APIConfig defines API connection settings
+// APIConfig defines API connection settings. Credential fields are
+// json:"-" so they never leak through JSON serialization paths.
+//
+// Token is the legacy single-field shape used by pre-plasmactl-auth
+// platforms. New platforms use provider-specific 2+ field shapes:
+//   OVH:       ClientID + ClientSecret (+ account_region stored alongside the credential, not in platform.yaml)
+//   Scaleway:  AccessKey + SecretKey
+//
+// Backward compat: validate accepts either shape; create writes only
+// the new shape for ovh/scaleway. Other providers still use Token.
 type APIConfig struct {
-	URI   string `yaml:"uri,omitempty"   json:"uri,omitempty"`
-	Token string `yaml:"token,omitempty" json:"-"`
+	URI          string `yaml:"uri,omitempty"           json:"uri,omitempty"`
+	Token        string `yaml:"token,omitempty"         json:"-"` // DEPRECATED for ovh/scaleway
+	ClientID     string `yaml:"client_id,omitempty"     json:"-"` // OVH
+	ClientSecret string `yaml:"client_secret,omitempty" json:"-"` // OVH
+	AccessKey    string `yaml:"access_key,omitempty"    json:"-"` // Scaleway
+	SecretKey    string `yaml:"secret_key,omitempty"    json:"-"` // Scaleway
 }
 
 // Networking defines network configuration

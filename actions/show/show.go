@@ -81,7 +81,15 @@ func (s *Show) Execute() error {
 
 	// Sanitize secrets before exposing in structured output.
 	platform.Infrastructure.API.Token = ""
+	platform.Infrastructure.API.ClientID = ""
+	platform.Infrastructure.API.ClientSecret = ""
+	platform.Infrastructure.API.AccessKey = ""
+	platform.Infrastructure.API.SecretKey = ""
 	platform.DNS.API.Token = ""
+	platform.DNS.API.ClientID = ""
+	platform.DNS.API.ClientSecret = ""
+	platform.DNS.API.AccessKey = ""
+	platform.DNS.API.SecretKey = ""
 	platform.DNS.DKIMKey = ""
 
 	// Build result

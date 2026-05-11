@@ -52,99 +52,93 @@ func (c *Create) Result() any {
 	return c.result
 }
 
-// Execute runs the platform:create action
-func (c *Create) Execute() error {
-	platformDir := filepath.Join("platforms", c.Name)
-	nodesDir := filepath.Join(platformDir, "nodes")
-	platformFile := filepath.Join(platformDir, "platform.yaml")
+// ScaffoldOptions is the input to ScaffoldPlatform — pure data, no I/O.
+type ScaffoldOptions struct {
+	Name          string
+	MetalProvider string
+	DNSProvider   string
+	Domain        string
+	Zone          string
+	Region        string
+	ProjectID     string
+	Image         string
+	SSHKeyID      string
+}
 
-	// Check if platform already exists
-	if _, err := os.Stat(platformDir); !os.IsNotExist(err) {
-		return fmt.Errorf("platform %q already exists at %s", c.Name, platformDir)
-	}
+// ScaffoldPlatform produces a Platform with provider-specific credential
+// placeholders. Pure function — no filesystem I/O. Used by Execute() and
+// by unit tests.
+func ScaffoldPlatform(opts ScaffoldOptions) (*schema.Platform, error) {
+	platform := schema.NewPlatform(opts.Name, opts.MetalProvider, opts.DNSProvider, opts.Domain)
 
-	c.Term().Info().Printfln("Creating platform %q", c.Name)
-	c.Term().Info().Printfln("  Metal provider: %s", c.MetalProvider)
-	c.Term().Info().Printfln("  DNS provider: %s", c.DNSProvider)
-	c.Term().Info().Printfln("  Domain: %s", c.Domain)
-
-	// Create directories
-	if err := os.MkdirAll(nodesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create nodes directory: %w", err)
-	}
-
-	// Create platform.yaml
-	platform := schema.NewPlatform(c.Name, c.MetalProvider, c.DNSProvider, c.Domain)
-
-	// Set provider-specific defaults for metal provider
-	switch c.MetalProvider {
+	switch opts.MetalProvider {
 	case "scaleway":
 		platform.Infrastructure.API = schema.APIConfig{
-			URI:   "https://api.online.net/api/v1/",
-			Token: "{{ .keyring.scaleway_api_token }}",
+			URI:       "https://api.online.net/api/v1/",
+			AccessKey: "{{ .keyring.scaleway_access_key }}",
+			SecretKey: "{{ .keyring.scaleway_secret_key }}",
 		}
-		if c.Zone == "" {
+		if opts.Zone == "" {
 			platform.Infrastructure.Zone = "fr-par-2"
 		}
 	case "hetzner":
 		platform.Infrastructure.API = schema.APIConfig{
 			Token: "{{ .keyring.hetzner_api_token }}",
 		}
-		if c.Zone == "" {
+		if opts.Zone == "" {
 			platform.Infrastructure.Zone = "fsn1"
 		}
-		if c.Image == "" {
+		if opts.Image == "" {
 			platform.Infrastructure.Image = "ubuntu-24.04"
 		}
 	case "ovh":
 		platform.Infrastructure.API = schema.APIConfig{
-			Token: "{{ .keyring.ovh_api_token }}",
+			ClientID:     "{{ .keyring.ovh_client_id }}",
+			ClientSecret: "{{ .keyring.ovh_client_secret }}",
 		}
-		if c.Region == "" {
+		if opts.Region == "" {
 			platform.Infrastructure.Region = "eu"
 		}
-		if c.Zone == "" {
+		if opts.Zone == "" {
 			platform.Infrastructure.Zone = "rbx"
 		}
-		if c.Image == "" {
+		if opts.Image == "" {
 			platform.Infrastructure.Image = "debian12_64"
 		}
 	case "aws":
-		// AWS uses environment variables or SDK defaults for credentials
-		if c.Region == "" {
+		if opts.Region == "" {
 			platform.Infrastructure.Region = "eu-west-1"
 		}
-		if c.Zone == "" {
+		if opts.Zone == "" {
 			platform.Infrastructure.Zone = "eu-west-1a"
 		}
 	case "gcp", "azure":
-		// Cloud providers use environment variables or SDK defaults
+		// SDK/env-based auth, no placeholders
 	case "manual":
-		// No API or infrastructure configuration needed
+		// no credentials needed
 	}
 
-	// User-provided values override defaults
-	if c.Zone != "" {
-		platform.Infrastructure.Zone = c.Zone
+	if opts.Zone != "" {
+		platform.Infrastructure.Zone = opts.Zone
 	}
-	if c.Region != "" {
-		platform.Infrastructure.Region = c.Region
+	if opts.Region != "" {
+		platform.Infrastructure.Region = opts.Region
 	}
-	if c.ProjectID != "" {
-		platform.Infrastructure.ProjectID = c.ProjectID
+	if opts.ProjectID != "" {
+		platform.Infrastructure.ProjectID = opts.ProjectID
 	}
-	if c.Image != "" {
-		platform.Infrastructure.Image = c.Image
+	if opts.Image != "" {
+		platform.Infrastructure.Image = opts.Image
 	}
-	if c.SSHKeyID != "" {
-		platform.Infrastructure.SSHKeyID = c.SSHKeyID
+	if opts.SSHKeyID != "" {
+		platform.Infrastructure.SSHKeyID = opts.SSHKeyID
 	}
 
-	// Set DNS provider defaults
-	switch c.DNSProvider {
+	switch opts.DNSProvider {
 	case "ovh":
 		platform.DNS.API = schema.APIConfig{
-			Token: "{{ .keyring.ovh_api_token }}",
+			ClientID:     "{{ .keyring.ovh_client_id }}",
+			ClientSecret: "{{ .keyring.ovh_client_secret }}",
 		}
 		if platform.DNS.Region == "" {
 			platform.DNS.Region = "eu"
@@ -163,9 +157,45 @@ func (c *Create) Execute() error {
 		}
 	}
 
-	// Derive DNS zone from domain if not set
 	if platform.DNS.Zone == "" && platform.DNS.Domain != "" {
 		platform.DNS.Zone = dns.DeriveZone(platform.DNS.Domain)
+	}
+
+	return platform, nil
+}
+
+// Execute runs the platform:create action
+func (c *Create) Execute() error {
+	platformDir := filepath.Join("platforms", c.Name)
+	nodesDir := filepath.Join(platformDir, "nodes")
+	platformFile := filepath.Join(platformDir, "platform.yaml")
+
+	if _, err := os.Stat(platformDir); !os.IsNotExist(err) {
+		return fmt.Errorf("platform %q already exists at %s", c.Name, platformDir)
+	}
+
+	c.Term().Info().Printfln("Creating platform %q", c.Name)
+	c.Term().Info().Printfln("  Metal provider: %s", c.MetalProvider)
+	c.Term().Info().Printfln("  DNS provider: %s", c.DNSProvider)
+	c.Term().Info().Printfln("  Domain: %s", c.Domain)
+
+	if err := os.MkdirAll(nodesDir, 0755); err != nil {
+		return fmt.Errorf("failed to create nodes directory: %w", err)
+	}
+
+	platform, err := ScaffoldPlatform(ScaffoldOptions{
+		Name:          c.Name,
+		MetalProvider: c.MetalProvider,
+		DNSProvider:   c.DNSProvider,
+		Domain:        c.Domain,
+		Zone:          c.Zone,
+		Region:        c.Region,
+		ProjectID:     c.ProjectID,
+		Image:         c.Image,
+		SSHKeyID:      c.SSHKeyID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to build platform: %w", err)
 	}
 
 	data, err := yaml.Marshal(platform)

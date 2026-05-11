@@ -43,9 +43,9 @@ action:
       default: false
     - name: prepare-dir
       title: Prepare Directory
-      description: Directory containing prepared model
+      description: Directory containing prepared model (output of model:prepare)
       type: string
-      default: ".plasma/prepare"
+      default: ".plasma/model/prepare"
   result:
     type: object
     properties:

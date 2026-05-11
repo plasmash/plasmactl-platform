@@ -12,6 +12,45 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ShapeOfAPICreds classifies the credential shape in an APIConfig.
+// Used by validate to drive pass/warn/fail decisions per provider.
+//
+// Shapes:
+//   "empty"        — nothing set
+//   "legacy"       — Token set (old single-field shape)
+//   "ovh-new"      — ClientID + ClientSecret set
+//   "ovh-partial"  — only one of ClientID / ClientSecret
+//   "scw-new"      — AccessKey + SecretKey set
+//   "scw-partial"  — only one of AccessKey / SecretKey
+//   "mixed"        — Token set together with any new-shape field
+func ShapeOfAPICreds(api schema.APIConfig) string {
+	hasToken := api.Token != ""
+	hasOVHNew := api.ClientID != "" && api.ClientSecret != ""
+	hasOVHAny := api.ClientID != "" || api.ClientSecret != ""
+	hasSCWNew := api.AccessKey != "" && api.SecretKey != ""
+	hasSCWAny := api.AccessKey != "" || api.SecretKey != ""
+
+	if hasToken && (hasOVHAny || hasSCWAny) {
+		return "mixed"
+	}
+	if hasToken {
+		return "legacy"
+	}
+	if hasOVHNew {
+		return "ovh-new"
+	}
+	if hasOVHAny {
+		return "ovh-partial"
+	}
+	if hasSCWNew {
+		return "scw-new"
+	}
+	if hasSCWAny {
+		return "scw-partial"
+	}
+	return "empty"
+}
+
 // ValidationCheck represents a single validation check result
 type ValidationCheck struct {
 	Name   string `json:"name"`
@@ -135,25 +174,60 @@ func (v *Validate) Execute() error {
 		}
 	}
 
-	// Validate API configuration
+	// Validate API configuration (legacy single-token shape OR new 2-field shape).
 	v.Term().Info().Println()
 	v.Term().Info().Println("API Configuration:")
-	if platform.Infrastructure.MetalProvider != "manual" {
-		if platform.Infrastructure.API.Token == "" {
-			v.Term().Warning().Println("  ! API token not configured")
-			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "warning"})
-			hasWarnings = true
-		} else if strings.Contains(platform.Infrastructure.API.Token, "{{ .keyring.") {
-			v.Term().Success().Println("  ✓ API token configured (keyring reference)")
-			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "pass", Value: "keyring"})
-		} else {
-			v.Term().Warning().Println("  ! API token is hardcoded (consider using keyring)")
-			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "warning", Value: "hardcoded"})
-			hasWarnings = true
-		}
-	} else {
+	if platform.Infrastructure.MetalProvider == "manual" {
 		v.Term().Info().Println("  - Skipped (manual provider)")
-		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_token", Status: "pass", Value: "manual"})
+		v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "pass", Value: "manual"})
+	} else {
+		shape := ShapeOfAPICreds(platform.Infrastructure.API)
+		switch shape {
+		case "empty":
+			v.Term().Warning().Println("  ! API credentials not configured")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "warning"})
+			hasWarnings = true
+
+		case "legacy":
+			if strings.Contains(platform.Infrastructure.API.Token, "{{ .keyring.") {
+				prov := platform.Infrastructure.MetalProvider
+				if prov == "ovh" || prov == "scaleway" {
+					v.Term().Warning().Printfln("  ! api.token is deprecated for %s; migrate to 2-field form (plasmactl auth:login %s)", prov, prov)
+					v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "warning", Value: "deprecated-token"})
+					hasWarnings = true
+				} else {
+					v.Term().Success().Println("  ✓ API token configured (keyring reference)")
+					v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "pass", Value: "keyring"})
+				}
+			} else {
+				v.Term().Warning().Println("  ! API token is hardcoded (consider using keyring)")
+				v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "warning", Value: "hardcoded"})
+				hasWarnings = true
+			}
+
+		case "ovh-new":
+			v.Term().Success().Println("  ✓ OVH credentials configured (client_id + client_secret)")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "pass", Value: "ovh-2field"})
+
+		case "ovh-partial":
+			v.Term().Error().Println("  ✗ OVH credentials incomplete (need both client_id and client_secret)")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "fail", Value: "ovh-incomplete"})
+			hasErrors = true
+
+		case "scw-new":
+			v.Term().Success().Println("  ✓ Scaleway credentials configured (access_key + secret_key)")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "pass", Value: "scw-2field"})
+
+		case "scw-partial":
+			v.Term().Error().Println("  ✗ Scaleway credentials incomplete (need both access_key and secret_key)")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "fail", Value: "scw-incomplete"})
+			hasErrors = true
+
+		case "mixed":
+			v.Term().Error().Println("  ✗ Both api.token and 2-field credentials set — pick one shape only")
+			v.result.Checks = append(v.result.Checks, ValidationCheck{Name: "api_creds", Status: "fail", Value: "mixed-shape"})
+			hasErrors = true
+		}
 	}
 
 	// Validate pool configuration

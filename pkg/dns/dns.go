@@ -3,6 +3,7 @@ package dns
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,6 +28,13 @@ type Config struct {
 	MailIP       string // Mail ingress failover IP (for MX, SPF)
 	DKIMSelector string // DKIM selector (default: "default")
 	DKIMKey      string // DKIM public key (base64)
+
+	// OVH 2-field credentials (plasmactl-auth shape).
+	// When OVHClientID is non-empty, the OVH template branches to use
+	// client_id + client_secret + endpoint vars instead of access_token.
+	OVHClientID     string
+	OVHClientSecret string
+	OVHEndpoint     string // "ovh-eu" | "ovh-ca" | "ovh-us"
 }
 
 // providerTemplates maps DNS provider names to their HCL templates
@@ -92,6 +100,25 @@ func (m *Manager) GenerateHCL(config Config) error {
 		return fmt.Errorf("failed to write DNS main.tf: %w", err)
 	}
 
+	// Per-run credentials → 0600 auto.tfvars.json (auto-loaded by OpenTofu).
+	tfvarsPath := filepath.Join(m.workDir, "credentials.auto.tfvars.json")
+	vars := buildDNSTFVars(config)
+	if len(vars) == 0 {
+		_ = os.Remove(tfvarsPath)
+	} else {
+		// Defense: WriteFile only applies perms on creation; remove any stale file first.
+		if err := os.Remove(tfvarsPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("dns: clear stale tfvars: %w", err)
+		}
+		b, err := json.Marshal(vars)
+		if err != nil {
+			return fmt.Errorf("dns: marshal tfvars: %w", err)
+		}
+		if err := os.WriteFile(tfvarsPath, b, 0o600); err != nil {
+			return fmt.Errorf("dns: write tfvars: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -133,4 +160,25 @@ func DeriveZone(domain string) string {
 		return domain
 	}
 	return strings.Join(parts[len(parts)-2:], ".")
+}
+
+// buildDNSTFVars maps a DNS Config into TF variable names expected by the
+// rendered HCL. Empty fields fall through to template defaults.
+func buildDNSTFVars(cfg Config) map[string]string {
+	v := map[string]string{}
+	switch cfg.Provider {
+	case "ovh":
+		if cfg.OVHClientID != "" {
+			v["ovh_client_id"] = cfg.OVHClientID
+			v["ovh_client_secret"] = cfg.OVHClientSecret
+			v["ovh_endpoint"] = cfg.OVHEndpoint
+		} else if cfg.APIToken != "" {
+			v["api_token"] = cfg.APIToken
+		}
+	default:
+		if cfg.APIToken != "" {
+			v["api_token"] = cfg.APIToken
+		}
+	}
+	return v
 }
