@@ -103,10 +103,18 @@ import {
 resource "ovh_dedicated_server" "{{ $.EnvName | replace "-" "_" }}_{{ $existing.Pool | replace "-" "_" }}_existing_{{ $existing.Index }}" {
   service_name              = "{{ $existing.ImportID }}"
   prevent_install_on_import = true
+{{- if $existing.Hostname }}
+  display_name              = "{{ $existing.Hostname }}"
+
+  lifecycle {
+    ignore_changes = [plan, ovh_subsidiary, os, customizations]
+  }
+{{- else }}
 
   lifecycle {
     ignore_changes = all
   }
+{{- end }}
 }
 {{- end }}
 

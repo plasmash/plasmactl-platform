@@ -306,3 +306,102 @@ func TestRenderOVH_OutputMapKeyDistinct(t *testing.T) {
 	// shape entirely): canonical has dots, auto has dashes only.
 	assert.NotContains(t, out, `"ns1234567.ip-192-0-2.net" = ovh_dedicated_server.example_plat_control_0.`)
 }
+
+func TestRenderOVH_AdoptedDisplayName(t *testing.T) {
+	// When ExistingNode.Hostname is populated, the adopted resource block must
+	// declare display_name and use a targeted ignore_changes list instead of
+	// the sledgehammer ignore_changes = all.
+	out := renderOVHCustom(t, ProviderConfig{
+		OVHClientID:     "CID",
+		OVHClientSecret: "CSEC",
+		OVHEndpoint:     "ovh-eu",
+		Region:          "ca",
+		Zone:            "bhs",
+		Image:           "debian12_64",
+		Pools: []PoolSpec{
+			{Name: "control", Zones: []string{"foundation"}, Machine: "advance-1", Count: 1},
+		},
+		ImportOnly: true,
+		ExistingNodes: []ExistingNode{
+			{Pool: "control", Index: 0, ImportID: "ns1234567.ip-192-0-2.net", Hostname: "demo-control-001"},
+		},
+	})
+
+	assert.Contains(t, out, `display_name              = "demo-control-001"`)
+	assert.Contains(t, out, `ignore_changes = [plan, ovh_subsidiary, os, customizations]`)
+	assert.NotContains(t, out, `ignore_changes = all`)
+}
+
+func TestRenderOVH_AdoptedDisplayNameFallback(t *testing.T) {
+	// When ExistingNode.Hostname is empty (before plasmactl-node populates it),
+	// the adopted resource block must fall back to ignore_changes = all and
+	// must not declare display_name — identical to the prior behavior.
+	out := renderOVHCustom(t, ProviderConfig{
+		OVHClientID:     "CID",
+		OVHClientSecret: "CSEC",
+		OVHEndpoint:     "ovh-eu",
+		Region:          "ca",
+		Zone:            "bhs",
+		Image:           "debian12_64",
+		Pools: []PoolSpec{
+			{Name: "control", Zones: []string{"foundation"}, Machine: "advance-1", Count: 1},
+		},
+		ImportOnly: true,
+		ExistingNodes: []ExistingNode{
+			{Pool: "control", Index: 0, ImportID: "ns1234567.ip-192-0-2.net"},
+		},
+	})
+
+	// Scope assertions to the adopted section: the outputs section legitimately
+	// references .display_name on the resource, so a full-output check would be
+	// a false negative.
+	const adoptedStart = "# === Adopted resources"
+	adoptedStartIdx := strings.Index(out, adoptedStart)
+	require.NotEqual(t, -1, adoptedStartIdx, "adopted-resources section marker missing")
+	adoptedEndRel := strings.Index(out[adoptedStartIdx+len(adoptedStart):], "\n# === ")
+	require.NotEqual(t, -1, adoptedEndRel, "no section marker after adopted block")
+	adoptedSection := out[adoptedStartIdx : adoptedStartIdx+len(adoptedStart)+adoptedEndRel]
+
+	assert.NotContains(t, adoptedSection, `display_name`)
+	assert.Contains(t, adoptedSection, `ignore_changes = all`)
+}
+
+func TestRenderOVH_AdoptedIgnoreChangesList(t *testing.T) {
+	// When Hostname is set, the targeted ignore_changes list must contain
+	// exactly the four order-flow attributes (plan, ovh_subsidiary, os,
+	// customizations) and must NOT include display_name — that attribute is
+	// intentionally managed by TF so that updates propagate to OVH.
+	out := renderOVHCustom(t, ProviderConfig{
+		OVHClientID:     "CID",
+		OVHClientSecret: "CSEC",
+		OVHEndpoint:     "ovh-eu",
+		Region:          "ca",
+		Zone:            "bhs",
+		Image:           "debian12_64",
+		Pools: []PoolSpec{
+			{Name: "control", Zones: []string{"foundation"}, Machine: "advance-1", Count: 1},
+		},
+		ImportOnly: true,
+		ExistingNodes: []ExistingNode{
+			{Pool: "control", Index: 0, ImportID: "ns1234567.ip-192-0-2.net", Hostname: "demo-control-001"},
+		},
+	})
+
+	// Extract just the adopted section so assertions are scoped correctly.
+	const adoptedStart = "# === Adopted resources"
+	adoptedStartIdx := strings.Index(out, adoptedStart)
+	require.NotEqual(t, -1, adoptedStartIdx, "adopted-resources section marker missing")
+	adoptedEndRel := strings.Index(out[adoptedStartIdx+len(adoptedStart):], "\n# === ")
+	require.NotEqual(t, -1, adoptedEndRel, "no section marker after adopted block")
+	adoptedSection := out[adoptedStartIdx : adoptedStartIdx+len(adoptedStart)+adoptedEndRel]
+
+	// All four targeted attributes must appear in the ignore_changes list.
+	assert.Contains(t, adoptedSection, "plan")
+	assert.Contains(t, adoptedSection, "ovh_subsidiary")
+	assert.Contains(t, adoptedSection, "os")
+	assert.Contains(t, adoptedSection, "customizations")
+
+	// display_name must NOT appear inside the ignore_changes list — TF must
+	// be free to manage it so that Hostname changes propagate to OVH.
+	assert.NotRegexp(t, `ignore_changes\s*=\s*\[.*display_name`, adoptedSection)
+}

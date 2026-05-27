@@ -64,9 +64,10 @@ type PoolSpec struct {
 // Derived from node YAML files — enables stateless provisioning where
 // node files are the single source of truth.
 type ExistingNode struct {
-	Pool     string // pool name (matched from hostname)
-	Index    int    // 0-based index within pool (derived from hostname suffix)
+	Pool     string // pool name (matched from zones)
+	Index    int    // 0-based index within pool
 	ImportID string // provider-specific import ID (provider_metadata.server_id)
+	Hostname string // friendly name from node yaml; empty until plasmactl-node populates it
 }
 
 // ProviderConfig holds provider-agnostic configuration for HCL generation
