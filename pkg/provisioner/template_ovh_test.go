@@ -328,7 +328,7 @@ func TestRenderOVH_AdoptedDisplayName(t *testing.T) {
 	})
 
 	assert.Contains(t, out, `display_name              = "demo-control-001"`)
-	assert.Contains(t, out, `ignore_changes = [plan, ovh_subsidiary, os, customizations]`)
+	assert.Contains(t, out, `ignore_changes = [plan, ovh_subsidiary, os, customizations, properties, storage, rescue_mail, rescue_ssh_key]`)
 	assert.NotContains(t, out, `ignore_changes = all`)
 }
 
@@ -367,10 +367,14 @@ func TestRenderOVH_AdoptedDisplayNameFallback(t *testing.T) {
 }
 
 func TestRenderOVH_AdoptedIgnoreChangesList(t *testing.T) {
-	// When Hostname is set, the targeted ignore_changes list must contain
-	// exactly the four order-flow attributes (plan, ovh_subsidiary, os,
-	// customizations) and must NOT include display_name — that attribute is
-	// intentionally managed by TF so that updates propagate to OVH.
+	// When Hostname is set, the targeted ignore_changes list must cover every
+	// writable, Read-populated attribute except display_name. Order-flow
+	// attributes (plan, ovh_subsidiary) plus os and customizations are the
+	// original four; properties, storage, rescue_mail, and rescue_ssh_key are
+	// Optional-not-Computed fields that import pulls into state and would
+	// otherwise drift to null on apply (e.g. rescue_ssh_key set by the
+	// os-builder). display_name must NOT be ignored — TF manages it so that
+	// Hostname changes propagate to OVH.
 	out := renderOVHCustom(t, ProviderConfig{
 		OVHClientID:     "CID",
 		OVHClientSecret: "CSEC",
@@ -395,11 +399,14 @@ func TestRenderOVH_AdoptedIgnoreChangesList(t *testing.T) {
 	require.NotEqual(t, -1, adoptedEndRel, "no section marker after adopted block")
 	adoptedSection := out[adoptedStartIdx : adoptedStartIdx+len(adoptedStart)+adoptedEndRel]
 
-	// All four targeted attributes must appear in the ignore_changes list.
-	assert.Contains(t, adoptedSection, "plan")
-	assert.Contains(t, adoptedSection, "ovh_subsidiary")
-	assert.Contains(t, adoptedSection, "os")
-	assert.Contains(t, adoptedSection, "customizations")
+	// Every writable, Read-populated attribute except display_name must appear
+	// in the ignore_changes list.
+	for _, attr := range []string{
+		"plan", "ovh_subsidiary", "os", "customizations",
+		"properties", "storage", "rescue_mail", "rescue_ssh_key",
+	} {
+		assert.Contains(t, adoptedSection, attr, "ignore_changes must include %q", attr)
+	}
 
 	// display_name must NOT appear inside the ignore_changes list — TF must
 	// be free to manage it so that Hostname changes propagate to OVH.

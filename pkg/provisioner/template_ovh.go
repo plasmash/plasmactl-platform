@@ -107,7 +107,7 @@ resource "ovh_dedicated_server" "{{ $.EnvName | replace "-" "_" }}_{{ $existing.
   display_name              = "{{ $existing.Hostname }}"
 
   lifecycle {
-    ignore_changes = [plan, ovh_subsidiary, os, customizations]
+    ignore_changes = [plan, ovh_subsidiary, os, customizations, properties, storage, rescue_mail, rescue_ssh_key]
   }
 {{- else }}
 
