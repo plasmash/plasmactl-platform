@@ -1,0 +1,75 @@
+working_directory: "{{ .current_working_dir }}/.plasma/model/prepare"
+action:
+  title: Deploy Platform
+  icon: rocket_launch
+  description: Deploy Ansible resources to a target platform's cluster
+  arguments:
+    - name: name
+      title: Name
+      description: The platform to deploy to (matches platforms/<name>/ directory)
+      required: true
+    - name: tags
+      title: Tags
+      description: The Ansible resources to deploy (comma-separated tag list)
+      required: true
+  options:
+    - name: image
+      title: Platform Image
+      description: Deploy from a Platform Image (.pi) file
+      type: string
+      default: ""
+    - name: debug
+      title: Debug
+      description: Run ansible-playbook in verbose mode (-vvv)
+      type: boolean
+      default: false
+    - name: check
+      title: Check
+      description: Run ansible-playbook in check mode (dry-run)
+      type: boolean
+      default: false
+    - name: password
+      title: Vault Password
+      description: Ansible vault password (resolved from launchr keyring entry "vaultpass")
+      process:
+        - processor: keyring.GetKeyValue
+          options:
+            key: vaultpass
+      default: ""
+    - name: logs
+      title: Logs
+      description: Store ansible output in deploy.log
+      type: boolean
+      default: false
+
+runtime:
+  type: container
+  image: platform-actions-deploy:latest
+  env:
+    ANSIBLE_CONFIG: ${ANSIBLE_CONFIG:-./ansible.cfg}
+    OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+    OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES}
+    OTEL_EXPORTER_OTLP_TIMEOUT: 30000
+    OTEL_EXPORTER_OTLP_COMPRESSION: gzip
+  build:
+    context: ./
+    args:
+      USER_ID: "{{ .current_uid }}"
+      GROUP_ID: "{{ .current_gid }}"
+      USER_NAME: plasma
+  command:
+    - python
+    - -B
+    - /action/action.py
+    - "{{ .name }}"
+    - "{{ .tags }}"
+    - --image
+    - "{{ .image }}"
+    - --debug
+    - "{{ .debug }}"
+    - --check
+    - "{{ .check }}"
+    - --password
+    - "{{ .password }}"
+    - --logs
+    - "{{ .logs }}"

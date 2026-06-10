@@ -18,7 +18,6 @@ import (
 
 	"github.com/plasmash/plasmactl-platform/actions/check"
 	"github.com/plasmash/plasmactl-platform/actions/create"
-	"github.com/plasmash/plasmactl-platform/actions/deploy"
 	"github.com/plasmash/plasmactl-platform/actions/destroy"
 	"github.com/plasmash/plasmactl-platform/actions/impact"
 	"github.com/plasmash/plasmactl-platform/actions/list"
@@ -35,6 +34,27 @@ var actionYamlFS embed.FS
 
 //go:embed actions/graph/component.js
 var graphComponentJS []byte
+
+//go:embed actions/deploy/action.yaml
+var deployActionYaml []byte
+
+//go:embed actions/deploy/Dockerfile
+var deployDockerfile []byte
+
+//go:embed actions/deploy/action.py
+var deployActionPy []byte
+
+//go:embed actions/deploy/discovery.py
+var deployDiscoveryPy []byte
+
+//go:embed actions/deploy/opentelemetry.py
+var deployOtelPy []byte
+
+//go:embed actions/deploy/profile_roles.py
+var deployProfileRolesPy []byte
+
+//go:embed actions/deploy/profile_tasks.py
+var deployProfileTasksPy []byte
 
 func init() {
 	launchr.RegisterPlugin(&Plugin{})
@@ -70,6 +90,10 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 	// Resolve the OpenTofu binary (system PATH → cache → download).
 	if err := p.initTofuBinary(); err != nil {
 		launchr.Log().Debug("tofu binary not available", "err", err)
+	}
+
+	if err := p.initDeployContainerAction(); err != nil {
+		launchr.Log().Warn("failed to extract deploy container action", "err", err)
 	}
 	return nil
 }
@@ -148,6 +172,49 @@ func (p *Plugin) initTofuBinary() error {
 	}
 	pkgtofu.SetBinaryPath(binPath)
 	launchr.Log().Debug("tofu downloaded", "path", binPath)
+	return nil
+}
+
+// initDeployContainerAction extracts the embedded deploy container action
+// files to a fixed cache directory and registers that directory as a launchr
+// discovery FS, so yamldiscovery picks up the action and registers
+// "platform:deploy" in the action manager. Mirrors initGraphBinary's pattern.
+//
+// Cache layout: <userCacheDir>/plasmactl/deploy/platform/actions/deploy/
+// yields action ID "platform:deploy" via DefaultIDProvider's parent-dir naming.
+func (p *Plugin) initDeployContainerAction() error {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		cacheDir = os.TempDir()
+	}
+	base := filepath.Join(cacheDir, "plasmactl", "deploy")
+	actionDir := filepath.Join(base, "platform", "actions", "deploy")
+	if err = os.MkdirAll(actionDir, 0o755); err != nil {
+		return err
+	}
+	files := []struct {
+		name    string
+		content []byte
+		mode    os.FileMode
+	}{
+		{"action.yaml", deployActionYaml, 0o644},
+		{"Dockerfile", deployDockerfile, 0o644},
+		{"action.py", deployActionPy, 0o755},
+		{"discovery.py", deployDiscoveryPy, 0o644},
+		{"opentelemetry.py", deployOtelPy, 0o644},
+		{"profile_roles.py", deployProfileRolesPy, 0o644},
+		{"profile_tasks.py", deployProfileTasksPy, 0o644},
+	}
+	for _, f := range files {
+		if err = os.WriteFile(filepath.Join(actionDir, f.name), f.content, f.mode); err != nil {
+			return err
+		}
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		wd = base
+	}
+	p.app.RegisterFS(action.NewDiscoveryFS(os.DirFS(base), wd))
 	return nil
 }
 
@@ -309,30 +376,6 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		return d.Result(), err
 	}))
 	actions = append(actions, destroyAction)
-
-	// platform:deploy action
-	deployYaml, _ := actionYamlFS.ReadFile("actions/deploy/deploy.yaml")
-	deployAction := action.NewFromYAML("platform:deploy", deployYaml)
-	deployAction.SetRuntime(action.NewFnRuntimeWithResult(func(_ context.Context, a *action.Action) (any, error) {
-		input := a.Input()
-		log, term := getLoggerTerm(a)
-		d := &deploy.Deploy{
-			Keyring:     p.k,
-			Name:       input.Arg("name").(string),
-			Tags:       input.Arg("tags").(string),
-			Image:      input.Opt("image").(string),
-			Debug:       input.Opt("debug").(bool),
-			Check:       input.Opt("check").(bool),
-			Password:    input.Opt("password").(string),
-			Logs:        input.Opt("logs").(bool),
-			PrepareDir:  input.Opt("prepare-dir").(string),
-		}
-		d.SetLogger(log)
-		d.SetTerm(term)
-		err := d.Execute()
-		return d.Result(), err
-	}))
-	actions = append(actions, deployAction)
 
 	// platform:check action
 	checkYaml, _ := actionYamlFS.ReadFile("actions/check/check.yaml")
