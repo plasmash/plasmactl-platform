@@ -2,7 +2,6 @@ package up
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/launchrctl/keyring"
@@ -26,6 +25,7 @@ type UpOptions struct {
 	Debug              bool
 	ConflictsVerbosity bool
 	GitlabDomain       string
+	ForgeToken         string
 	Streams            launchr.Streams
 	Persistent         action.InputParams
 }
@@ -93,7 +93,7 @@ func (u *Up) Run(ctx context.Context, name, tags string, options UpOptions) erro
 
 		err := u.executeAction(ctx, "platform:deploy", action.InputParams{
 			"name": name,
-			"tags":        tags,
+			"tags": tags,
 		}, action.InputParams{
 			"image": options.Image,
 			"debug": options.Debug,
@@ -111,8 +111,6 @@ func (u *Up) Run(ctx context.Context, name, tags string, options UpOptions) erro
 	if ansibleDebug {
 		u.Term().Info().Printfln("Ansible debug mode: %t", ansibleDebug)
 	}
-
-	var username, password string
 
 	// Commit unversioned changes if any
 	err := u.G.CommitChangesIfAny()
@@ -167,7 +165,7 @@ func (u *Up) Run(ctx context.Context, name, tags string, options UpOptions) erro
 
 		err = u.executeAction(ctx, "platform:deploy", action.InputParams{
 			"name": name,
-			"tags":        tags,
+			"tags": tags,
 		}, action.InputParams{
 			"debug": options.Debug,
 		}, options.Persistent, options.Streams)
@@ -193,30 +191,18 @@ func (u *Up) Run(ctx context.Context, name, tags string, options UpOptions) erro
 		if gitlabDomain == "" {
 			return fmt.Errorf("gitlab-domain is empty: pass it as option or local config")
 		}
-		u.Term().Info().Printfln("Getting user credentials for %s from keyring", gitlabDomain)
-		c, save, err := u.getCredentials(gitlabDomain, username, password)
-		if err != nil {
-			return err
-		}
-		u.Term().Printfln("URL: %s", c.URL)
-		u.Term().Printfln("Username: %s", c.Username)
-
-		username = c.Username
-		password = c.Password
-
-		// Get Gitlab OAuth token
-		gitlabAccessToken, err := u.CI.GetOAuthTokens(gitlabDomain, username, password)
-		if err != nil {
-			return fmt.Errorf("failed to get OAuth token: %w", err)
-		}
-
-		// Save gitlab credentials to keyring once API requests are successful
-		if save {
-			err = u.K.Save()
-			u.Log().Debug("saving user credentials to keyring", "url", gitlabDomain)
+		// Forge token (GitLab PAT, api scope): prefer --forge-token, else read keyring key
+		// release_forge_token. Resolved here in the CI path only, so local runs never require it.
+		gitlabAccessToken := options.ForgeToken
+		if gitlabAccessToken == "" {
+			item, err := u.K.GetForKey("release_forge_token")
 			if err != nil {
-				u.Log().Error("error during saving keyring file", "error", err)
+				return fmt.Errorf("forge-token is empty: pass --forge-token or provision keyring key 'release_forge_token' (GitLab PAT, api scope): %w", err)
 			}
+			gitlabAccessToken, _ = item.Value.(string)
+		}
+		if gitlabAccessToken == "" {
+			return fmt.Errorf("forge-token is empty: pass --forge-token or set keyring key 'release_forge_token' (GitLab PAT, api scope)")
 		}
 
 		// Get branch name
@@ -262,7 +248,7 @@ func (u *Up) Run(ctx context.Context, name, tags string, options UpOptions) erro
 		}
 
 		// Trigger the manual job
-		err = u.CI.TriggerManualJob(gitlabDomain, gitlabAccessToken, projectID, targetJobID, pipelineID)
+		err = u.CI.TriggerManualJob(gitlabDomain, gitlabAccessToken, projectID, name, tags, targetJobID, pipelineID)
 		if err != nil {
 			return fmt.Errorf("failed to trigger manual job: %w", err)
 		}
@@ -306,39 +292,4 @@ func (u *Up) executeAction(ctx context.Context, id string, args, opts, persisten
 		return fmt.Errorf("error executing action %q: %w", id, err)
 	}
 	return nil
-}
-
-func (u *Up) getCredentials(url, username, password string) (keyring.CredentialsItem, bool, error) {
-	ci, err := u.K.GetForURL(url)
-	save := false
-	if err != nil {
-		if errors.Is(err, keyring.ErrEmptyPass) {
-			return ci, false, err
-		} else if !errors.Is(err, keyring.ErrNotFound) {
-			u.Log().Error("error", "error", err)
-			return ci, false, errors.New("the keyring is malformed or wrong passphrase provided")
-		}
-		ci = keyring.CredentialsItem{}
-		ci.URL = url
-		ci.Username = username
-		ci.Password = password
-		if ci.Username == "" || ci.Password == "" {
-			if ci.URL != "" {
-				u.Term().Info().Printfln("Please add login and password for %s", ci.URL)
-			}
-			err = keyring.RequestCredentialsFromTty(&ci)
-			if err != nil {
-				return ci, false, err
-			}
-		}
-
-		err = u.K.AddItem(ci)
-		if err != nil {
-			return ci, false, err
-		}
-
-		save = true
-	}
-
-	return ci, save, nil
 }
