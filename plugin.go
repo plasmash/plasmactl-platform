@@ -253,6 +253,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 			Debug:              input.Opt("debug").(bool),
 			ConflictsVerbosity: input.Opt("conflicts-verbosity").(bool),
 			GitlabDomain:       input.Opt("gitlab-domain").(string),
+			ForgeToken:         input.Opt("forge-token").(string),
 			Streams:            a.Input().Streams(),
 			Persistent:         a.Input().GroupFlags(p.m.GetPersistentFlags().GetName()),
 		}
@@ -365,7 +366,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		input := a.Input()
 		log, term := getLoggerTerm(a)
 		d := &destroy.Destroy{
-			Keyring:    p.k,
+			Keyring: p.k,
 			Name:    input.Arg("name").(string),
 			Force:   input.Opt("force").(bool),
 			KeepDNS: input.Opt("keep-dns").(bool),
